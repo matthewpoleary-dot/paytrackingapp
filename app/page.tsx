@@ -8,7 +8,9 @@ import {
 } from '@/lib/db/queries';
 import { formatMinutes, valuePeriod } from '@/lib/pay/calc';
 import { formatCents } from '@/lib/pay/money';
+import { nextPeriodStart } from '@/lib/pay/period';
 import {
+  addDays,
   dublinDate,
   formatDateRange,
   formatDublinTime,
@@ -27,12 +29,37 @@ import {
   SecondaryLink,
 } from '@/app/_components/ui';
 
-export default async function ThisPeriod() {
+export default async function ThisPeriod(props: PageProps<'/'>) {
   const settings = await getSettings();
   if (!settings) redirect('/setup');
 
+  const params = await props.searchParams;
   const today = dublinDate();
-  const period = periodContaining(today, settings);
+  const current = periodContaining(today, settings);
+
+  // Which period is being looked at. Defaults to the one containing today, but
+  // every period is reachable — without this, shifts logged for next week save
+  // correctly and then appear nowhere, which reads as the app losing them.
+  const requested = typeof params.period === 'string' ? params.period : undefined;
+  const period = requested ? periodContaining(requested, settings) : current;
+
+  const previous = periodContaining(addDays(period.startsOn, -1), settings);
+  const next = periodContaining(
+    nextPeriodStart(period.startsOn, settings.pay_period_length),
+    settings,
+  );
+
+  const isCurrent = period.startsOn === current.startsOn;
+  const isFuture = period.startsOn > current.startsOn;
+  const label = isCurrent
+    ? 'This period'
+    : isFuture
+      ? period.startsOn === next.startsOn || previous.startsOn === current.startsOn
+        ? 'Next period'
+        : 'Ahead'
+      : previous.startsOn === period.startsOn || period.endsOn < today
+        ? 'Earlier period'
+        : 'Last period';
 
   const [shifts, unconfirmed] = await Promise.all([
     getShiftsBetween(period.startsOn, period.endsOn),
@@ -42,25 +69,46 @@ export default async function ThisPeriod() {
   const value = valuePeriod(shifts, settings);
   const byId = new Map(value.byShift.map((v) => [v.shiftId, v]));
 
+  const worthLabel = isFuture
+    ? 'This period will be worth about'
+    : value.estimated
+      ? 'This period is worth about'
+      : 'This period is worth';
+
   return (
     <Screen>
-      <header className="mb-5 flex items-baseline justify-between">
-        <div>
-          <p className="t-label text-fg-secondary">This period</p>
-          <h1 className="t-heading mt-1">
-            {formatDateRange(period.startsOn, period.endsOn)}
-          </h1>
+      <header className="mb-4 flex items-start justify-between gap-2">
+        <div className="min-w-0">
+          <p className="t-label text-fg-secondary">{label}</p>
+          <div className="mt-1 flex items-center gap-1">
+            <PeriodStep href={`/?period=${previous.startsOn}`} label="Previous period">
+              &lsaquo;
+            </PeriodStep>
+            <h1 className="t-heading whitespace-nowrap tabular-nums">
+              {formatDateRange(period.startsOn, period.endsOn)}
+            </h1>
+            <PeriodStep href={`/?period=${next.startsOn}`} label="Next period">
+              &rsaquo;
+            </PeriodStep>
+          </div>
         </div>
-        <Link href="/setup?edit=1" className="t-caption min-h-9 px-1 pt-2 text-fg-secondary">
+        <Link
+          href="/settings"
+          className="t-caption min-h-9 shrink-0 px-1 pt-1.5 text-fg-secondary tabular-nums"
+        >
           {formatCents(settings.hourly_rate_cents)}/hr
         </Link>
       </header>
 
+      {!isCurrent && (
+        <Link href="/" className="t-caption mb-3 inline-block text-attention underline">
+          Back to this period
+        </Link>
+      )}
+
       {/* -- The number. The whole point of the screen. ------------------- */}
       <Card inverse className="px-6 py-7">
-        <p className="t-caption opacity-70">
-          {value.estimated ? 'This period is worth about' : 'This period is worth'}
-        </p>
+        <p className="t-caption opacity-70">{worthLabel}</p>
         <p className="mt-2">
           <Money cents={value.cents} estimated={value.estimated} size="hero" />
         </p>
@@ -100,7 +148,7 @@ export default async function ThisPeriod() {
             Sunday work unless it was already built into your rate &mdash; which many
             hospitality contracts do. Worth checking your contract.
           </p>
-          <Link href="/setup?edit=1" className="t-caption mt-2 inline-block text-attention underline">
+          <Link href="/settings" className="t-caption mt-2 inline-block text-attention underline">
             Record a Sunday rate
           </Link>
         </Card>
@@ -149,17 +197,43 @@ export default async function ThisPeriod() {
       {value.estimated && shifts.length > 0 && (
         <div className="mt-3 px-1">
           <EstimateNote>
-            Figures marked ~ assume you finished when rostered and took your break.
+            {isFuture
+              ? 'Nothing here has been worked yet, so every figure is a plan.'
+              : 'Figures marked ~ assume you finished when rostered and took your break.'}
           </EstimateNote>
         </div>
       )}
 
       <div className="mt-auto space-y-2 pt-8">
-        <PrimaryLink href="/roster">Add next week&rsquo;s shifts</PrimaryLink>
-        {unconfirmed.length === 0 && shifts.length > 0 && (
-          <SecondaryLink href="/roster?week=this">Add a shift to this week</SecondaryLink>
+        <PrimaryLink href={isFuture ? `/roster?start=${period.startsOn}` : '/roster'}>
+          {isFuture ? 'Add more shifts here' : 'Add next week’s shifts'}
+        </PrimaryLink>
+        {isCurrent && (
+          <SecondaryLink href="/roster?week=this">
+            Add a shift to this week
+          </SecondaryLink>
         )}
       </div>
     </Screen>
+  );
+}
+
+function PeriodStep({
+  href,
+  label,
+  children,
+}: {
+  href: string;
+  label: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <Link
+      href={href}
+      aria-label={label}
+      className="t-figure -my-1 flex size-8 shrink-0 items-center justify-center rounded-md text-fg-secondary transition-colors duration-150 active:bg-segment-track"
+    >
+      {children}
+    </Link>
   );
 }

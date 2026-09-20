@@ -81,5 +81,13 @@ export async function saveRoster(
   }
 
   revalidatePath('/');
-  redirect('/');
+
+  // Land on the period those shifts actually went into, not wherever the user
+  // happened to be. Logging next week's roster and being returned to a screen
+  // showing this week reads as the app having lost them.
+  const landing = periodContaining(
+    drafts.map((d) => d.workDate).sort()[0],
+    settings,
+  );
+  redirect(`/?period=${landing.startsOn}`);
 }
