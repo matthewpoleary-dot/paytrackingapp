@@ -81,6 +81,7 @@ export async function saveRoster(
   }
 
   revalidatePath('/');
+  revalidatePath('/period');
 
   // Land on the period those shifts actually went into, not wherever the user
   // happened to be. Logging next week's roster and being returned to a screen
@@ -89,5 +90,5 @@ export async function saveRoster(
     drafts.map((d) => d.workDate).sort()[0],
     settings,
   );
-  redirect(`/?period=${landing.startsOn}`);
+  redirect(`/period?period=${landing.startsOn}`);
 }

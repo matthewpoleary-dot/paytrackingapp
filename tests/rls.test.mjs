@@ -172,3 +172,107 @@ test('RLS: one user cannot reach another user\'s data', async (t) => {
     );
   });
 });
+
+test('RLS: one user cannot reach another user\'s goal or contributions', async (t) => {
+  const alice = await anonUser('alice');
+  const bob = await anonUser('bob');
+  assert.notEqual(alice.id, bob.id, 'the two sessions must be different users');
+
+  // --- Alice sets a goal and puts money against it ------------------------
+
+  const { data: goal, error: goalErr } = await alice.client
+    .from('goal')
+    .insert({ user_id: alice.id, name: 'Deposit', target_cents: 300000 })
+    .select()
+    .single();
+  assert.equal(goalErr, null, `alice could not write her own goal: ${goalErr?.message}`);
+
+  const { data: contribution, error: contribErr } = await alice.client
+    .from('contribution')
+    .insert({
+      user_id: alice.id,
+      goal_id: goal.id,
+      amount_cents: 15000,
+      contributed_on: '2026-09-19',
+      note: 'first week',
+    })
+    .select()
+    .single();
+  assert.equal(contribErr, null, `alice could not write her own contribution: ${contribErr?.message}`);
+
+  // --- Positive half: the rows exist and their owner can see them ---------
+
+  await t.test('alice can read her own goal and contributions', async () => {
+    for (const table of ['goal', 'contribution']) {
+      const { data, error } = await alice.client.from(table).select('id');
+      assert.equal(error, null, `alice got an error reading ${table}: ${error?.message}`);
+      assert.ok(
+        data.length > 0,
+        `alice sees no rows in ${table} — the negative assertions below would be vacuous`,
+      );
+    }
+  });
+
+  // --- Negative half -------------------------------------------------------
+
+  await t.test('bob cannot read alice\'s goal or contributions', async () => {
+    for (const table of ['goal', 'contribution']) {
+      const { data, error } = await bob.client.from(table).select('*');
+      assert.equal(error, null, `unexpected error reading ${table}: ${error?.message}`);
+      assert.deepEqual(data, [], `LEAK: bob can see ${data?.length} row(s) in ${table}`);
+    }
+  });
+
+  await t.test('bob cannot read alice\'s contribution by its id', async () => {
+    const { data, error } = await bob.client
+      .from('contribution')
+      .select('*')
+      .eq('id', contribution.id);
+    assert.equal(error, null);
+    assert.deepEqual(data, [], 'LEAK: bob fetched alice\'s contribution by primary key');
+  });
+
+  await t.test('bob cannot attach a contribution to alice\'s goal', async () => {
+    const { error } = await bob.client.from('contribution').insert({
+      user_id: alice.id,
+      goal_id: goal.id,
+      amount_cents: 5000,
+      contributed_on: '2026-09-20',
+    });
+    assert.ok(error, 'LEAK: bob wrote a contribution under alice\'s user_id');
+    assert.match(error.message, /row-level security/i);
+  });
+
+  await t.test('bob cannot move alice\'s target', async () => {
+    const { data, error } = await bob.client
+      .from('goal')
+      .update({ target_cents: 1 })
+      .eq('id', goal.id)
+      .select();
+    assert.equal(error, null);
+    assert.deepEqual(data, [], 'LEAK: bob updated alice\'s goal');
+
+    const { data: after } = await alice.client
+      .from('goal')
+      .select('target_cents')
+      .eq('id', goal.id)
+      .single();
+    assert.equal(after.target_cents, 300000, 'LEAK: alice\'s goal was modified by bob');
+  });
+
+  await t.test('bob cannot delete alice\'s contribution', async () => {
+    const { data, error } = await bob.client
+      .from('contribution')
+      .delete()
+      .eq('id', contribution.id)
+      .select();
+    assert.equal(error, null);
+    assert.deepEqual(data, [], 'LEAK: bob deleted alice\'s contribution');
+
+    const { data: after } = await alice.client
+      .from('contribution')
+      .select('id')
+      .eq('id', contribution.id);
+    assert.equal(after.length, 1, 'LEAK: alice\'s contribution is gone');
+  });
+});

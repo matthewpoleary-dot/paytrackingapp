@@ -141,3 +141,71 @@ export async function ensurePeriodRow(period: Period, userId: string): Promise<v
 export function weekDates(startsOn: string): string[] {
   return Array.from({ length: 7 }, (_, i) => addDays(startsOn, i));
 }
+
+/** Every shift from a date onwards. Used by the dashboard's long-term views. */
+export async function getShiftsSince(from: string): Promise<Shift[]> {
+  if (!hasSupabaseEnv()) return [];
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from('shift')
+    .select('*')
+    .gte('work_date', from)
+    .order('work_date', { ascending: true });
+  return data ?? [];
+}
+
+/** All shifts on one Dublin day. */
+export async function getShiftsOn(date: string): Promise<Shift[]> {
+  if (!hasSupabaseEnv()) return [];
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from('shift')
+    .select('*')
+    .eq('work_date', date)
+    .order('planned_start_at', { ascending: true });
+  return data ?? [];
+}
+
+export interface Goal {
+  id: string;
+  name: string;
+  target_cents: number;
+  target_date: string | null;
+}
+
+export interface Contribution {
+  id: string;
+  amount_cents: number;
+  contributed_on: string;
+  note: string | null;
+}
+
+/**
+ * The live goal, or null.
+ *
+ * Tolerates the table not existing so the dashboard still renders on a
+ * database where migration 2 has not been applied yet — a missing feature
+ * should degrade to an invitation, not a 500.
+ */
+export async function getGoal(): Promise<Goal | null> {
+  if (!hasSupabaseEnv()) return null;
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from('goal')
+    .select('id, name, target_cents, target_date')
+    .is('archived_at', null)
+    .maybeSingle();
+  if (error) return null;
+  return data;
+}
+
+export async function getContributions(): Promise<Contribution[]> {
+  if (!hasSupabaseEnv()) return [];
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from('contribution')
+    .select('id, amount_cents, contributed_on, note')
+    .order('contributed_on', { ascending: true });
+  if (error) return [];
+  return data ?? [];
+}

@@ -73,5 +73,6 @@ export async function saveConfirmations(
   }
 
   revalidatePath('/');
-  redirect('/');
+  revalidatePath('/period');
+  redirect('/period');
 }
