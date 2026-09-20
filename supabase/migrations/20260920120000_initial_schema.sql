@@ -55,7 +55,10 @@ create table public.settings (
   user_id                       uuid not null unique
                                   references auth.users (id) on delete cascade,
 
-  -- First run, question 1.
+  -- First run, question 1. This is "my rate now" — the default copied onto
+  -- each new shift, NOT the rate historical shifts are valued at. Changing
+  -- it is the pay-rise flow, and it must not disturb the existing log.
+  -- See the comment on shift.hourly_rate_cents.
   hourly_rate_cents             integer not null check (hourly_rate_cents > 0),
 
   -- First run, question 2. Irish law gives no right to paid breaks, so this
@@ -206,10 +209,18 @@ create table public.shift (
 
   source                public.shift_source not null default 'manual',
 
-  -- Unused in v1: the rate comes from settings. Present so that a per-shift
-  -- override, or snapshotting the rate in force on the day, is additive
-  -- rather than a schema change. NULL means "use the settings rate".
-  hourly_rate_cents     integer check (hourly_rate_cents > 0),
+  -- The rate this shift was actually worked at, copied from settings when
+  -- the shift is logged. NOT NULL on purpose.
+  --
+  -- settings.hourly_rate_cents is "my rate now" and is only ever the default
+  -- for new shifts. If it were the single source of truth, a pay rise would
+  -- silently re-price every shift already in the log and last month would
+  -- quietly become worth more than it was. For a calculator that is a
+  -- nuisance; for a record you might put in front of the WRC it is fatal.
+  --
+  -- Storing it here also is what makes a pay rise a normal settings change
+  -- rather than a migration, and it doubles as the per-shift override.
+  hourly_rate_cents     integer not null check (hourly_rate_cents > 0),
 
   created_at            timestamptz not null default now(),
   updated_at            timestamptz not null default now(),

@@ -101,6 +101,16 @@ optimisation if entry still feels slow — not a v1 problem.
 **Rate:** one rate per user for now, stored so that a per-shift override
 can be added later without a migration.
 
+**Pay rises, decided 2026-09-20.** Every shift stores the rate it was
+worked at, copied from settings when it is logged. `settings.hourly_rate_cents`
+is "my rate now" and is *only* the default for new shifts — never the
+source of truth for what a logged shift was worth. Changing it is the
+pay-rise flow and must leave the existing log untouched. If the settings
+rate were authoritative, a rise would silently re-price every shift already
+recorded and last month would quietly become worth more than it was — which
+would destroy the app as evidence. The same column doubles as the per-shift
+override.
+
 ## The bar
 
 **The competitor is the Notes app.** If logging a shift is slower than

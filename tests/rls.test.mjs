@@ -69,6 +69,7 @@ test('RLS: one user cannot reach another user\'s data', async (t) => {
       planned_start_at: iso('2026-09-26T17:00:00Z'),
       planned_end_at: iso('2026-09-27T00:00:00Z'),
       planned_break_minutes: 30,
+      hourly_rate_cents: 1385,
     })
     .select()
     .single();
@@ -110,6 +111,7 @@ test('RLS: one user cannot reach another user\'s data', async (t) => {
       planned_start_at: iso('2026-09-27T17:00:00Z'),
       planned_end_at: iso('2026-09-27T23:00:00Z'),
       planned_break_minutes: 30,
+      hourly_rate_cents: 1385,
     });
     assert.ok(error, 'LEAK: bob wrote a row under alice\'s user_id');
     assert.match(error.message, /row-level security/i);
