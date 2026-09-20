@@ -8,19 +8,24 @@ PAYE/USC/PRSI. Mobile-first, 390px primary.
 
 ## Status
 
-Scaffold and initial schema in. Migration written but **not yet
-applied** — no Supabase connection on this machine, so the cross-user RLS
-test in `tests/rls.test.mjs` has not been run. See below.
+Scaffold, initial schema and first-run setup are in and live at
+https://paytrackingapp.vercel.app. The migration is applied and
+`tests/rls.test.mjs` passes 8/8 against the real database.
+
+Next: roster entry, end-of-week confirmation, what the period is worth.
 
 ## Running the RLS test
 
 ```bash
-cp .env.example .env.local   # fill in from Supabase -> Project Settings -> API Keys
 npm run test:rls
 ```
 
-Needs the migration applied and anonymous sign-ins enabled in Supabase
-(Authentication -> Sign In / Providers -> Anonymous).
+Needs `.env.local` (`npx vercel env pull .env.local`), the migration applied,
+and anonymous sign-ins enabled in Supabase.
+
+**A green run on its own proves nothing.** Before trusting it — and after any
+policy change — follow `supabase/verify-rls-test.sql` to open a deliberate
+hole, watch exactly two tests go red, then close it.
 
 ## Layout
 
@@ -31,6 +36,8 @@ Needs the migration applied and anonymous sign-ins enabled in Supabase
 | `docs/PAY-RULES.md` | Sourced Irish pay rules. |
 | `supabase/migrations/` | Forward-only. Never edit an applied migration. |
 | `tests/rls.test.mjs` | Cross-user isolation. Must be watched to fail. |
+| `supabase/verify-rls-test.sql` | How to watch it fail. |
+| `scripts/shot.mjs` | 390x844 screenshot harness. |
 
 ## Stack
 
