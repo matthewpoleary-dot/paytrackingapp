@@ -12,7 +12,7 @@ import {
 import { aggregate, byDay, byWeek, provisionalNote } from '@/lib/pay/aggregate';
 import { formatMinutes } from '@/lib/pay/calc';
 import { formatCents, sumCents } from '@/lib/pay/money';
-import { dublinDate, formatDateRange } from '@/lib/time/dublin';
+import { addDays, dublinDate, formatDateRange, startOfDublinWeek } from '@/lib/time/dublin';
 import {
   Card,
   EstimateNote,
@@ -20,8 +20,17 @@ import {
   Screen,
 } from '@/app/_components/ui';
 import { CalendarLegend, MonthCalendar } from '@/app/_components/MonthCalendar';
+import {
+  ChartLegend,
+  DayOfWeekBars,
+  WeeklyBars,
+  type Bar,
+  type DayBar,
+} from '@/app/_components/charts';
+import { project } from '@/lib/pay/projection';
 
 const MONTH_NAME = new Intl.DateTimeFormat('en-IE', { timeZone: 'UTC', month: 'long' });
+const SHORT_MONTH = new Intl.DateTimeFormat('en-IE', { timeZone: 'UTC', month: 'short' });
 const ISO_MONTH = /^\d{4}-\d{2}$/;
 
 export default async function Dashboard(props: PageProps<'/'>) {
@@ -68,7 +77,64 @@ export default async function Dashboard(props: PageProps<'/'>) {
     : 0;
   const weeksEstimated = weeks.some((w) => w.estimated);
 
+  // Up to 12 weeks, but never reaching back past the first shift ever logged.
+  // Padding the chart out to a fixed 12 would draw weeks of zero earnings for
+  // a period before the app was being used — inventing unemployment.
+  // Empty weeks INSIDE the range are kept: those are real.
+  const weekMap = byWeek(yearShifts, settings);
+  const mondays = [...weekMap.keys()].sort();
+  const firstMonday = mondays[0];
+  // The window ends at the LAST week holding shifts, not at today — a roster
+  // logged for next week counts in the yearly total, so leaving it out of the
+  // chart would make the two disagree.
+  const lastMonday = mondays.length
+    ? [mondays[mondays.length - 1], startOfDublinWeek()].sort().pop()!
+    : startOfDublinWeek();
+  const weekCount = firstMonday
+    ? Math.min(
+        12,
+        Math.round(
+          (Date.parse(`${lastMonday}T00:00:00Z`) - Date.parse(`${firstMonday}T00:00:00Z`)) /
+            (7 * 24 * 60 * 60 * 1000),
+        ) + 1,
+      )
+    : 0;
+
+  const weekBars: Bar[] = Array.from({ length: weekCount }, (_, i) => {
+    const monday = addDays(lastMonday, (i - (weekCount - 1)) * 7);
+    const w = weekMap.get(monday);
+    const previous = i > 0 ? addDays(lastMonday, (i - weekCount) * 7) : null;
+    // Label a bar only where the month changes — day numbers alone read as
+    // meaningless integers, and one label per bar does not fit at 390px.
+    const newMonth = previous === null || previous.slice(5, 7) !== monday.slice(5, 7);
+    return {
+      key: monday,
+      label: `Week of ${monday}`,
+      tick: newMonth ? SHORT_MONTH.format(new Date(`${monday}T00:00:00Z`)) : '',
+      confirmed: w?.confirmedCents ?? 0,
+      estimated: w?.estimatedCents ?? 0,
+    };
+  });
+
+  const dayOfWeekBars: DayBar[] = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map(
+    (label, index) => {
+      const onThisDay = yearShifts.filter((s) => {
+        const [yy, mm, dd] = s.work_date.split('-').map(Number);
+        return (new Date(Date.UTC(yy, mm - 1, dd)).getUTCDay() + 6) % 7 === index;
+      });
+      const confirmed = onThisDay.filter((s) => s.actuals_confirmed_at !== null);
+      const estimated = onThisDay.filter((s) => s.actuals_confirmed_at === null);
+      return {
+        key: label,
+        label,
+        confirmedMinutes: aggregate(confirmed, settings).paidMinutes,
+        estimatedMinutes: aggregate(estimated, settings).paidMinutes,
+      };
+    },
+  );
+
   const saved = sumCents(contributions.map((c) => c.amount_cents));
+  const projection = goal ? project(goal, contributions, today) : null;
 
   const prevMonth = shiftMonth(viewMonth, -1);
   const nextMonth = shiftMonth(viewMonth, 1);
@@ -204,11 +270,30 @@ export default async function Dashboard(props: PageProps<'/'>) {
             note={weeks.length === 0 ? 'no weeks yet' : `over ${weeks.length}`}
           />
         </div>
-        <div className="mt-2">
-          <Card className="px-5 py-6 text-center">
-            <p className="t-caption text-fg-secondary">
-              Earnings over time and hours by day of week land here next.
-            </p>
+        <div className="mt-2 space-y-2">
+          <Card className="px-4 py-4">
+            <p className="t-label text-fg-secondary">Earnings by week</p>
+            <div className="mb-3 mt-1.5">
+              <ChartLegend />
+            </div>
+            {weekBars.length === 0 ? (
+              <p className="t-caption py-6 text-center text-fg-secondary">
+                A few weeks of shifts and this fills in.
+              </p>
+            ) : (
+              <WeeklyBars
+                bars={weekBars}
+                caption={`Earnings for the last ${weekBars.length} weeks.`}
+              />
+            )}
+          </Card>
+
+          <Card className="px-4 py-4">
+            <p className="t-label text-fg-secondary">Hours by day of week</p>
+            <div className="mb-3 mt-1.5">
+              <ChartLegend />
+            </div>
+            <DayOfWeekBars days={dayOfWeekBars} />
           </Card>
         </div>
       </section>
@@ -216,25 +301,58 @@ export default async function Dashboard(props: PageProps<'/'>) {
       {/* -- 5. Savings goal. ---------------------------------------------- */}
       <section className="mt-6">
         <p className="t-label mb-2 px-1 text-fg-secondary">Savings goal</p>
-        <Card className="px-5 py-5">
-          {goal ? (
-            <>
-              <p className="t-heading">{goal.name}</p>
-              <p className="mt-1.5">
-                <Money cents={saved} estimated={false} size="display" />
-                <span className="t-caption text-fg-secondary">
-                  {' of '}
-                  {formatCents(goal.target_cents)}
-                </span>
-              </p>
-            </>
-          ) : (
-            <p className="t-caption text-fg-secondary">
-              Set a target and record what you actually put aside. Earnings are already
-              known &mdash; this tracks what survives.
-            </p>
-          )}
-        </Card>
+        <Link href="/goal" className="block">
+          <Card className="px-5 py-5">
+            {goal && projection ? (
+              <>
+                <div className="flex items-baseline justify-between gap-2">
+                  <p className="t-heading">{goal.name}</p>
+                  <span aria-hidden="true" className="t-caption text-fg-secondary">
+                    &rarr;
+                  </span>
+                </div>
+                <p className="mt-1.5 flex items-baseline gap-1.5">
+                  <Money cents={saved} estimated={false} size="display" />
+                  <span className="t-caption text-fg-secondary">
+                    of {formatCents(goal.target_cents)}
+                  </span>
+                </p>
+                <div
+                  className="mt-3 h-2 w-full overflow-hidden rounded-full bg-segment-track"
+                  role="img"
+                  aria-label={`${Math.round(projection.progress * 100)} percent of target`}
+                >
+                  <div
+                    className="h-full rounded-full bg-accent"
+                    style={{
+                      width: `${Math.max(projection.progress * 100, saved > 0 ? 2 : 0)}%`,
+                    }}
+                  />
+                </div>
+                <p className="t-caption mt-2.5 text-fg-secondary">
+                  {projection.reached
+                    ? 'Target reached.'
+                    : projection.reason
+                      ? projection.reason
+                      : `On track for ${projection.projectedDate} — about ${projection.weeksRemaining} more week${projection.weeksRemaining === 1 ? '' : 's'} at ${formatCents(projection.perWeekCents!)} a week.`}
+                </p>
+              </>
+            ) : (
+              <>
+                <div className="flex items-baseline justify-between gap-2">
+                  <p className="t-heading">Set a goal</p>
+                  <span aria-hidden="true" className="t-caption text-fg-secondary">
+                    &rarr;
+                  </span>
+                </div>
+                <p className="t-caption mt-1 text-fg-secondary">
+                  Pick a target and record what you actually put aside. Earnings are
+                  already tracked &mdash; this is what survives.
+                </p>
+              </>
+            )}
+          </Card>
+        </Link>
       </section>
 
       <div className="h-8" />

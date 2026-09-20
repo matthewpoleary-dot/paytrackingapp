@@ -72,6 +72,30 @@ await page.getByRole('button', { name: /^Add shift$/ }).click();
 await page.getByText(/^Shift 1$/).waitFor({ timeout: 25000 });
 await shot('day-filled');
 
+// --- Savings goal -----------------------------------------------------------
+await page.goto(`${BASE}/goal`, { waitUntil: 'networkidle' });
+await shot('goal-empty');
+// Skipped entirely until migration 2 is applied — the goal tables do not
+// exist yet, and the form reports that rather than throwing.
+try {
+  await page.fill('input[name="name"]', 'Deposit');
+  await page.fill('input[name="target"]', '2500');
+  await page.getByRole('button', { name: /Set goal/ }).click();
+  await page.getByText(/Record what you set aside/).waitFor({ timeout: 8000 });
+
+  for (const [amount, date] of [['120', '2026-09-05'], ['90', '2026-09-12'], ['150', '2026-09-19']]) {
+    await page.fill('input[name="amount"]', amount);
+    await page.fill('input[name="date"]', date);
+    await page.getByRole('button', { name: /Add contribution/ }).click();
+    await page.waitForTimeout(900);
+  }
+  await page.goto(`${BASE}/goal`, { waitUntil: 'networkidle' });
+  await shot('goal');
+} catch {
+  console.log('goal            SKIPPED — migration 2 not applied');
+  await shot('goal-error');
+}
+
 // --- The dashboard ----------------------------------------------------------
 await page.goto(`${BASE}/`, { waitUntil: 'networkidle' });
 await shot('dashboard');
