@@ -27,3 +27,4 @@ test-results/
 *.tsbuildinfo
 next-env.d.ts
 *.pem
+.shots/

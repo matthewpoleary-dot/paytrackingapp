@@ -1,6 +1,6 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { createServerClient } from '@supabase/ssr';
-import { SUPABASE_PUBLISHABLE_KEY, SUPABASE_URL } from './env';
+import { SUPABASE_PUBLISHABLE_KEY, SUPABASE_URL, hasSupabaseEnv } from './env';
 
 // Refreshes the session cookie on every request, and creates an anonymous
 // one the first time somebody arrives. There is no auth screen in v1 — but
@@ -9,6 +9,11 @@ import { SUPABASE_PUBLISHABLE_KEY, SUPABASE_URL } from './env';
 // migrating a single row.
 export async function updateSession(request: NextRequest) {
   let response = NextResponse.next({ request });
+
+  // Before credentials exist there is no session to keep. The UI still
+  // renders so it can be built and reviewed; anything needing a session says
+  // so plainly rather than 500ing every route.
+  if (!hasSupabaseEnv()) return response;
 
   const supabase = createServerClient(
     SUPABASE_URL(),
