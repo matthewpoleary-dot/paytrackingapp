@@ -31,10 +31,23 @@ export const viewport: Viewport = {
   ],
 };
 
+// Runs before first paint, so a refresh mid-session gets the skeleton rather
+// than showing the cold-open screen again and then snapping out of it.
+const BOOTED_FLAG = `try{if(sessionStorage.getItem('tally.booted'))document.documentElement.setAttribute('data-booted','')}catch(e){}`;
+
+// suppressHydrationWarning on <html> because the script above sets
+// data-booted on it before React hydrates, so the server and client markup
+// legitimately differ. It covers that element's own attributes only, not
+// anything inside the tree.
 export default function RootLayout({ children }: LayoutProps<'/'>) {
   return (
-    <html lang="en-IE" className={`${geist.variable} h-full`}>
-      <body className="min-h-full">{children}</body>
+    <html lang="en-IE" className={`${geist.variable} h-full`} suppressHydrationWarning>
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: BOOTED_FLAG }} />
+      </head>
+      <body className="min-h-full">
+        {children}
+      </body>
     </html>
   );
 }

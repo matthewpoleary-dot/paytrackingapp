@@ -316,3 +316,23 @@ input, select, textarea, button { font: inherit; font-size: 1.0625rem; }
   0%, 100% { opacity: 1; }
   50%      { opacity: 0.55; }
 }
+
+
+/* ===========================================================================
+   Cold open vs. in-app navigation
+   ---------------------------------------------------------------------------
+   Two different loading states for two genuinely different moments.
+
+   Opening the app cold: a full-bleed field and a timecode. There is no layout
+   to preserve yet, so a takeover costs nothing and gives the app a front door.
+
+   Navigating inside it: a skeleton. The layout already exists and the user is
+   mid-task; replacing it with a full-screen brand moment would throw away
+   their context to show them a logo they just tapped.
+
+   `data-booted` is set on <html> the first time the app renders, and read
+   before paint on later document loads, so neither state ever flashes.
+   ========================================================================= */
+
+:root:not([data-booted]) .boot-skeleton { display: none; }
+[data-booted] .boot { display: none; }
