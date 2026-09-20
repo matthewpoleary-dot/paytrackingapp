@@ -283,3 +283,36 @@ input, select, textarea, button { font: inherit; font-size: 1.0625rem; }
     transition-duration: 0.01ms !important;
   }
 }
+
+
+/* ===========================================================================
+   Loading
+   ---------------------------------------------------------------------------
+   A skeleton, not a spinner and not a splash. A spinner says "something is
+   happening"; a skeleton says "here is the shape of what is coming", which
+   makes the wait feel shorter and stops the layout jumping when content
+   lands. A branded splash would be the worst of the three — it adds time to
+   a four-second bar in exchange for showing a logo to someone who already
+   knows which app they opened.
+
+   The pulse is deliberately faint. It exists so the screen does not read as
+   frozen; anything more becomes decoration. The global reduced-motion rule
+   above flattens it to nothing.
+   ========================================================================= */
+
+.skeleton {
+  background: var(--segment-track);
+  border-radius: 0.5rem;
+  animation: skeleton-pulse 1.6s ease-in-out infinite;
+}
+
+.skeleton-on-inverse {
+  background: color-mix(in srgb, var(--fg-inverse) 14%, transparent);
+  border-radius: 0.5rem;
+  animation: skeleton-pulse 1.6s ease-in-out infinite;
+}
+
+@keyframes skeleton-pulse {
+  0%, 100% { opacity: 1; }
+  50%      { opacity: 0.55; }
+}

@@ -30,3 +30,29 @@ export function nextPeriodStart(
 ): string {
   return addDays(periodEnd(startsOn, length), 1);
 }
+
+/**
+ * The period before this one.
+ *
+ * Needed because the anchor is set the day the app is first opened, and
+ * shifts can be back-dated before it — a roster you are catching up on, or a
+ * correction to last month. Without this, those dates belonged to no period
+ * at all: they still counted in the calendar and the yearly total, but the
+ * period view showed them nowhere, so the two disagreed.
+ */
+export function previousPeriodStart(
+  startsOn: string,
+  length: PayPeriodLength,
+): string {
+  switch (length) {
+    case 'weekly':
+      return addDays(startsOn, -7);
+    case 'fortnightly':
+      return addDays(startsOn, -14);
+    case 'monthly': {
+      const [year, month] = startsOn.split('-').map(Number);
+      const d = new Date(Date.UTC(year, month - 2, 1));
+      return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}-01`;
+    }
+  }
+}

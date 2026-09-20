@@ -1,6 +1,6 @@
 import { createClient } from '@/lib/supabase/server';
 import { hasSupabaseEnv } from '@/lib/supabase/env';
-import { nextPeriodStart, periodEnd } from '@/lib/pay/period';
+import { nextPeriodStart, periodEnd, previousPeriodStart } from '@/lib/pay/period';
 import { addDays, dublinDate } from '@/lib/time/dublin';
 import type { Settings, Shift } from '@/lib/pay/types';
 
@@ -23,21 +23,28 @@ export interface Period {
   endsOn: string;
 }
 
-/** The period containing a given Dublin date, generated from the anchor. */
+/**
+ * The period containing a given Dublin date, generated from the anchor.
+ *
+ * Walks in either direction. Backwards matters: the anchor is set the day the
+ * app is first opened, and shifts can be back-dated before it. An earlier
+ * version clamped those to the first period, which meant a back-dated shift
+ * counted in the calendar and the yearly total but appeared in no period at
+ * all — the dashboard and the period view disagreed, and nothing said why.
+ */
 export function periodContaining(date: string, settings: Settings): Period {
   let startsOn = settings.period_anchor_date;
+  const length = settings.pay_period_length;
 
-  // Walk forward from the anchor. A user is realistically a handful of periods
-  // past setup, and walking is exact where month arithmetic is fiddly.
   let guard = 0;
-  while (periodEnd(startsOn, settings.pay_period_length) < date && guard++ < 600) {
-    startsOn = nextPeriodStart(startsOn, settings.pay_period_length);
+  while (periodEnd(startsOn, length) < date && guard++ < 2000) {
+    startsOn = nextPeriodStart(startsOn, length);
+  }
+  while (date < startsOn && guard++ < 2000) {
+    startsOn = previousPeriodStart(startsOn, length);
   }
 
-  // Dates before the anchor belong to no generated period; clamp to the first.
-  if (date < startsOn) startsOn = settings.period_anchor_date;
-
-  return { startsOn, endsOn: periodEnd(startsOn, settings.pay_period_length) };
+  return { startsOn, endsOn: periodEnd(startsOn, length) };
 }
 
 export function previousPeriod(period: Period, settings: Settings): Period {

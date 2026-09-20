@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Tally">
+  <!--
+    Tally. A tally stick was split in two: worker and payer each kept a half,
+    and the notches had to match. That is the app's argument, and the name
+    carries it — an earlier version tried to draw tally strokes into the
+    letterform and read as a temple at 16px. The meaning lives in the word.
+
+    So: a plain, confident T. Distinctive through proportion rather than
+    gimmick — a crossbar wider than a typeface would set it, a short stem,
+    generous counters. Deliberately heavier than the app's 450-weight display
+    type, because a light letterform dissolves in a browser tab.
+
+    No width/height attributes, so it scales to whatever box it is given.
+  -->
+  <rect width="64" height="64" rx="15" fill="#0B3028"/>
+  <g fill="#CBB47C">
+    <rect x="12" y="18" width="40" height="8" rx="4"/>
+    <rect x="28" y="18" width="8" height="30" rx="4"/>
+  </g>
+</svg>

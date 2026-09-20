@@ -13,9 +13,10 @@ const geist = Geist({
 });
 
 export const metadata: Metadata = {
-  title: 'Pay',
+  title: { default: 'Tally', template: '%s · Tally' },
   description: 'Log your shifts. Know what the week is worth.',
-  appleWebApp: { capable: true, statusBarStyle: 'black-translucent', title: 'Pay' },
+  applicationName: 'Tally',
+  appleWebApp: { capable: true, statusBarStyle: 'black-translucent', title: 'Tally' },
 };
 
 export const viewport: Viewport = {
