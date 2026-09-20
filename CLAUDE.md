@@ -148,8 +148,27 @@ not a paid product.
 
 ## Design direction
 
-Apple Health / iOS finance. Generous whitespace, restrained colour, real
-motion, data-dense but calm.
+Structure from Apple Health: a recessed page field, raised grouped cards,
+generous whitespace, data-dense but calm.
+
+**Surface and type from `tighsauna.com`** (chosen 2026-09-20). Deep forest
+green `#0B3028` and warm bone `#F3F1E6` as two complete worlds — light is
+the bone world, dark is the forest world — with brass `#CBB47C` as the only
+accent, carrying exactly one meaning: *not settled yet*.
+
+Two rules that came from studying it, and that matter more than the palette:
+
+- **Flat. No shadows anywhere.** Separation comes from the surface step and
+  from space. Shadows are what make a layout read as a dashboard.
+- **Large text is set light and tight, never bold.** Its h1 is 150px at
+  weight 450 with -0.073em tracking and leading below 1. Tracking is a
+  function of size, from about -0.055em at display to ~0 at caption — one
+  letter-spacing value would be wrong at both ends.
+
+Money is never accent-coloured. It is already the highest-contrast thing on
+the screen and needs no help.
+
+Real motion, but only once the static design has settled — see rule 1.
 
 ## Non-negotiable rules
 

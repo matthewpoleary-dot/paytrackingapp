@@ -46,10 +46,10 @@ export function SegmentedControl<T extends string>({
               className={[
                 'relative flex min-h-11 flex-1 cursor-pointer items-center',
                 'justify-center rounded-[0.625rem] px-3 text-center',
-                'transition-[background-color,box-shadow,color] duration-150',
+                'transition-[background-color,color] duration-150',
                 wrap ? 'basis-[calc(50%-0.125rem)]' : 'basis-0',
                 selected
-                  ? 'bg-segment-pill text-fg shadow-[var(--shadow-card)] font-semibold'
+                  ? 'bg-segment-pill font-medium text-fg'
                   : 'text-fg-secondary active:bg-black/5 dark:active:bg-white/5',
               ].join(' ')}
             >

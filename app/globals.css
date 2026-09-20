@@ -3,113 +3,110 @@
 /* ===========================================================================
    Tokens
    ---------------------------------------------------------------------------
-   Apple Health's grouped-surface structure: a recessed page field with raised
-   white cards sitting on it. Values are the iOS system palette rather than
-   invented ones, so the app sits correctly next to the OS in both schemes.
+   Palette and type discipline taken from tighsauna.com: a deep forest green
+   and a warm bone, with brass as the only accent. Two complete worlds rather
+   than one theme plus an inversion — light is the bone world, dark is the
+   forest world, and each gets its own accent, because brass on cream and
+   brass on green are not the same colour problem.
 
-   Light and dark are defined together from the start — dark is not a later
-   inversion pass.
+   Structure stays Apple Health: a recessed page field with raised cards. What
+   changes is that the surfaces are flat. No shadows anywhere — separation
+   comes from the surface step and from space. That is what makes the
+   reference read as calm rather than as a dashboard.
    ========================================================================= */
 
 :root {
-  /* Surfaces */
-  --surface:         #f2f2f7;  /* systemGroupedBackground */
-  --surface-raised:  #ffffff;  /* secondarySystemGroupedBackground */
-  --surface-sunken:  #e5e5ea;
+  /* Bone world */
+  --surface:         #ebe9dc;
+  --surface-raised:  #f7f5ec;
+  --surface-sunken:  #e0ddcd;
+  --surface-inverse: #0b3028;
 
-  /* Segmented control. The selected pill must always read LIGHTER than its
-     track, in both schemes, or it looks like a hole punched in the control
-     rather than a raised pill. */
-  --segment-track:   #e9e9ed;
-  --segment-pill:    #ffffff;
+  --fg:              #0b3028;  /* deep green, never black */
+  --fg-secondary:    #5263568c;
+  --fg-tertiary:     #0b302847;
+  --fg-placeholder:  #0b302826;
+  --fg-inverse:      #f3f1e6;
 
-  /* Placeholders sit below secondary text: a large faint 0.00 must not read
-     as a real rate of zero. */
-  --fg-placeholder:  rgb(60 60 67 / 0.22);
-  --surface-chrome:  rgb(242 242 247 / 0.72); /* translucent bars */
+  --separator:       #0b30281a;
+  --border:          #0b302826;
 
-  /* Text */
-  --fg:              #000000;
-  --fg-secondary:    rgb(60 60 67 / 0.60);
-  --fg-tertiary:     rgb(60 60 67 / 0.30);
+  /* Accent is the deep green itself. Money is never accent-coloured — it is
+     already the highest-contrast thing on the screen. */
+  --accent:          #0b3028;
+  --accent-fg:       #f3f1e6;
+  --accent-wash:     #0b30280d;
 
-  /* Lines */
-  --separator:       rgb(60 60 67 / 0.29);
-  --border:          rgb(60 60 67 / 0.18);
+  /* Brass carries exactly one job: "this is not settled yet". */
+  --attention:       #8a6d2f;
+  --attention-wash:  #cbb47c3d;
 
-  /* Accent — interactive only. Money is never accent-coloured; it is the
-     highest-contrast thing on the screen and needs no help. */
-  --accent:          #007aff;
-  --accent-fg:       #ffffff;
-  --accent-wash:     rgb(0 122 255 / 0.10);
+  --positive:        #2f6b43;
+  --critical:        #9b2c22;
 
-  /* Status. Attention is the "not confirmed yet" hue — used sparingly, and
-     never as the only signal. */
-  --attention:       #c2410c;
-  --attention-wash:  rgb(255 149 0 / 0.14);
-  --positive:        #1d7a45;
-  --critical:        #d70015;
-
-  /* Shadow — small surfaces sit close, big surfaces sit further off. */
-  --shadow-card:     0 1px 2px rgb(0 0 0 / 0.04), 0 1px 1px rgb(0 0 0 / 0.03);
-  --shadow-raised:   0 8px 24px rgb(0 0 0 / 0.10), 0 2px 6px rgb(0 0 0 / 0.06);
+  --segment-track:   #e0ddcd;
+  --segment-pill:    #f7f5ec;
 }
 
 @media (prefers-color-scheme: dark) {
+  html { color-scheme: dark; }
+
   :root {
-    --surface:         #000000;
-    --surface-raised:  #1c1c1e;
-    --surface-sunken:  #2c2c2e;
-    --segment-track:   rgb(118 118 128 / 0.24);
-    --segment-pill:    #636366;
-    --fg-placeholder:  rgb(235 235 245 / 0.22);
-    --surface-chrome:  rgb(28 28 30 / 0.72);
+    /* Forest world */
+    --surface:         #071f1a;
+    --surface-raised:  #0b3028;
+    --surface-sunken:  #0f3a31;
+    --surface-inverse: #f3f1e6;
 
-    --fg:              #ffffff;
-    --fg-secondary:    rgb(235 235 245 / 0.60);
-    --fg-tertiary:     rgb(235 235 245 / 0.30);
+    --fg:              #f3f1e6;
+    --fg-secondary:    #b9c9b8a8;
+    --fg-tertiary:     #b9c9b866;
+    --fg-placeholder:  #b9c9b83d;
+    --fg-inverse:      #0b3028;
 
-    --separator:       rgb(84 84 88 / 0.65);
-    --border:          rgb(84 84 88 / 0.45);
+    --separator:       #d3ddcb1f;
+    --border:          #d3ddcb33;
 
-    --accent:          #0a84ff;
-    --accent-fg:       #ffffff;
-    --accent-wash:     rgb(10 132 255 / 0.18);
+    /* On green, brass is the only thing warm enough to read as a primary
+       action. */
+    --accent:          #cbb47c;
+    --accent-fg:       #0b3028;
+    --accent-wash:     #cbb47c1f;
 
-    --attention:       #ff9f0a;
-    --attention-wash:  rgb(255 159 10 / 0.18);
-    --positive:        #30d158;
-    --critical:        #ff453a;
+    --attention:       #cbb47c;
+    --attention-wash:  #cbb47c26;
 
-    --shadow-card:     none;
-    --shadow-raised:   0 8px 24px rgb(0 0 0 / 0.50);
+    --positive:        #8fbf9a;
+    --critical:        #e3897e;
+
+    --segment-track:   #0f3a31;
+    --segment-pill:    #1c4c41;
   }
 }
 
 @theme inline {
-  --color-surface:        var(--surface);
-  --color-surface-raised: var(--surface-raised);
-  --color-surface-sunken: var(--surface-sunken);
-  --color-segment-track:  var(--segment-track);
-  --color-segment-pill:   var(--segment-pill);
-  --color-fg-placeholder: var(--fg-placeholder);
-  --color-fg:             var(--fg);
-  --color-fg-secondary:   var(--fg-secondary);
-  --color-fg-tertiary:    var(--fg-tertiary);
-  --color-separator:      var(--separator);
-  --color-border:         var(--border);
-  --color-accent:         var(--accent);
-  --color-accent-fg:      var(--accent-fg);
-  --color-accent-wash:    var(--accent-wash);
-  --color-attention:      var(--attention);
-  --color-attention-wash: var(--attention-wash);
-  --color-positive:       var(--positive);
-  --color-critical:       var(--critical);
+  --color-surface:         var(--surface);
+  --color-surface-raised:  var(--surface-raised);
+  --color-surface-sunken:  var(--surface-sunken);
+  --color-surface-inverse: var(--surface-inverse);
+  --color-fg:              var(--fg);
+  --color-fg-secondary:    var(--fg-secondary);
+  --color-fg-tertiary:     var(--fg-tertiary);
+  --color-fg-placeholder:  var(--fg-placeholder);
+  --color-fg-inverse:      var(--fg-inverse);
+  --color-separator:       var(--separator);
+  --color-border:          var(--border);
+  --color-accent:          var(--accent);
+  --color-accent-fg:       var(--accent-fg);
+  --color-accent-wash:     var(--accent-wash);
+  --color-attention:       var(--attention);
+  --color-attention-wash:  var(--attention-wash);
+  --color-positive:        var(--positive);
+  --color-critical:        var(--critical);
+  --color-segment-track:   var(--segment-track);
+  --color-segment-pill:    var(--segment-pill);
 
-  /* The platform font already ships optical sizing, tracking tables and
-     legibility tuning. On iOS this resolves to SF. */
-  --font-sans: -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui,
-               "Segoe UI", Roboto, sans-serif;
+  --font-sans: var(--font-geist), ui-sans-serif, system-ui, sans-serif;
 }
 
 
@@ -118,8 +115,9 @@
    ========================================================================= */
 
 html {
-  /* Percentage root so the user's text-size setting is respected and the
-     whole layout scales with it. */
+  /* Native controls - the time picker icon, the select arrow - follow this.
+     Without it Chrome paints them for a light page on top of the dark one. */
+  color-scheme: light;
   font-size: 100%;
   -webkit-text-size-adjust: 100%;
 }
@@ -128,84 +126,95 @@ body {
   background: var(--surface);
   color: var(--fg);
   font-family: var(--font-sans);
-  line-height: 1.47;
+  line-height: 1.45;
   -webkit-font-smoothing: antialiased;
-
-  /* Feel installed rather than browsed. */
   -webkit-tap-highlight-color: transparent;
   overscroll-behavior-y: none;
 }
 
-/* Text should be selectable; chrome should not be. Long-pressing a button
-   and getting a text-selection caret is the tell that this is a web page. */
 button, label, .t-label { -webkit-user-select: none; user-select: none; }
 
-/* Never let an input zoom the viewport on focus. 17px is iOS body size and
-   is comfortably over the 16px threshold that triggers the zoom. */
+/* 17px floor on inputs: anything smaller and iOS zooms the viewport on focus. */
 input, select, textarea, button { font: inherit; font-size: 1.0625rem; }
 
 :focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
-  border-radius: 4px;
+  border-radius: 3px;
+}
+
+.sr-only {
+  position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+  overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0;
 }
 
 
 /* ===========================================================================
    Type ramp
    ---------------------------------------------------------------------------
-   Tracking is size-specific: large text tightens, small text opens up
-   slightly. Leading moves inversely to size. Hierarchy comes from weight +
-   size + leading as a set, never size alone.
+   The reference's defining move: large text set LIGHT and very tight, not
+   bold. Its h1 runs 150px at weight 450, -0.073em tracking, leading below 1.
+   Bold-and-loose reads as a dashboard; light-and-tight reads as considered.
+
+   Tracking is a function of size — about -0.055em at display, ~0 at caption.
+   One letter-spacing value would be wrong at both ends.
    ========================================================================= */
 
 .t-hero {
-  font-size: clamp(2.5rem, 11.5vw, 3.25rem);
-  line-height: 1;
-  letter-spacing: -0.035em;
-  font-weight: 700;
+  font-size: clamp(3rem, 15vw, 4.25rem);
+  line-height: 0.94;
+  letter-spacing: -0.055em;
+  font-weight: 450;
   font-variant-numeric: tabular-nums;
 }
 
-.t-figure {
-  font-size: 1.0625rem;
-  line-height: 1.3;
-  letter-spacing: -0.01em;
-  font-weight: 600;
+.t-display {
+  font-size: 2.125rem;
+  line-height: 1.02;
+  letter-spacing: -0.042em;
+  font-weight: 450;
   font-variant-numeric: tabular-nums;
 }
 
 .t-title {
   font-size: 1.75rem;
-  line-height: 1.15;
-  letter-spacing: -0.022em;
-  font-weight: 700;
+  line-height: 1.08;
+  letter-spacing: -0.038em;
+  font-weight: 450;
+}
+
+.t-figure {
+  font-size: 1.125rem;
+  line-height: 1.25;
+  letter-spacing: -0.024em;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
 }
 
 .t-heading {
   font-size: 1.0625rem;
   line-height: 1.3;
-  letter-spacing: -0.012em;
-  font-weight: 600;
+  letter-spacing: -0.022em;
+  font-weight: 500;
 }
 
 .t-body {
   font-size: 1.0625rem;
-  line-height: 1.47;
-  letter-spacing: 0;
+  line-height: 1.45;
+  letter-spacing: -0.015em;
 }
 
 .t-caption {
   font-size: 0.8125rem;
-  line-height: 1.38;
-  letter-spacing: 0.005em;
+  line-height: 1.4;
+  letter-spacing: -0.005em;
 }
 
 .t-label {
-  font-size: 0.75rem;
+  font-size: 0.6875rem;
   line-height: 1.3;
-  letter-spacing: 0.055em;
-  font-weight: 600;
+  letter-spacing: 0.09em;
+  font-weight: 500;
   text-transform: uppercase;
 }
 
@@ -213,56 +222,49 @@ input, select, textarea, button { font: inherit; font-size: 1.0625rem; }
 /* ===========================================================================
    Estimated vs. confirmed
    ---------------------------------------------------------------------------
-   The single most load-bearing visual decision in the app. Until the actual
-   finish times are in, a figure is a guess, and it must never be able to be
-   mistaken for a fact.
+   Until the actual finish times are in, a figure is a guess and must never be
+   mistakable for a fact. Four redundant signals, so the distinction survives
+   greyscale, colour blindness, a screenshot and a screen reader:
 
-   Four redundant signals, so the distinction survives greyscale, colour
-   blindness, a screenshot, and a screen reader:
-
-     1. a leading  ~  on the number itself
-     2. lighter weight than a confirmed figure
+     1. a leading  ~  on the number
+     2. lighter weight than a settled figure
      3. a dashed underline — texture, not colour
      4. the word "Estimated", and an aria-label spelling it out
 
-   Confirmed figures get no marker at all. Plain, solid and full-weight IS
-   the marker; adding a tick to every settled number would make the settled
-   state the noisy one.
+   Settled figures carry no marker. Plain and solid IS the marker; ticking
+   every settled number would make the settled state the noisy one.
    ========================================================================= */
 
+/* Colour is inherited, never fixed. These land on the bone card AND on the
+   inverted green hero, and a hardcoded foreground renders the number
+   invisible on one of them. */
 .is-estimated {
-  font-weight: 500;
-  color: var(--fg);
-  text-decoration: underline dashed var(--fg-tertiary);
+  font-weight: 350;
+  color: inherit;
+  text-decoration-line: underline;
+  text-decoration-style: dashed;
+  text-decoration-color: color-mix(in srgb, currentColor 35%, transparent);
   text-underline-offset: 0.2em;
-  /* Relative so the dashes stay hairline-ish at 52px and still visible at 17px. */
-  text-decoration-thickness: max(1px, 0.045em);
+  text-decoration-thickness: max(1px, 0.035em);
 }
 
 .is-estimated::before {
   content: "~";
-  /* Smaller than the figure it qualifies, and tucked in close: at hero size a
-     full-size tilde reads as a separate character rather than a modifier. */
   font-size: 0.72em;
   margin-inline-end: 0.04em;
-  color: var(--fg-secondary);
-  font-weight: 400;
+  font-weight: 350;
+  opacity: 0.55;
 }
 
 .is-confirmed {
-  font-weight: 700;
-  color: var(--fg);
+  font-weight: 550;
+  color: inherit;
 }
 
 
 /* ===========================================================================
    Accessibility preferences
    ========================================================================= */
-
-@media (prefers-reduced-transparency: reduce) {
-  :root { --surface-chrome: var(--surface); }
-  .u-chrome { backdrop-filter: none; }
-}
 
 @media (prefers-contrast: more) {
   :root {
