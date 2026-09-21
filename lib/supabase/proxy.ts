@@ -58,6 +58,31 @@ export async function updateSession(request: NextRequest) {
   const path = request.nextUrl.pathname;
   const isPublic = PUBLIC_PATHS.some((p) => path === p || path.startsWith(`${p}/`));
 
+  // An auth code arriving anywhere other than the callback means Supabase
+  // fell back to the Site URL, which it does when the redirect it was handed
+  // is not in the project's allow-list. Without this the code is discarded
+  // and the user is bounced to /signin — a config error that looks exactly
+  // like a broken login, which is how it wasted an evening.
+  //
+  // Forwarding it is safe: the callback still exchanges it with Supabase, so
+  // a bad code fails loudly at /auth/error instead of silently here.
+  const authCode = request.nextUrl.searchParams.get('code');
+  const authError = request.nextUrl.searchParams.get('error');
+
+  if (!path.startsWith('/auth/') && (authCode || authError)) {
+    const target = request.nextUrl.clone();
+    if (authError) {
+      target.pathname = '/auth/error';
+      target.search = `?reason=${encodeURIComponent(
+        request.nextUrl.searchParams.get('error_description') ?? authError,
+      )}`;
+    } else {
+      target.pathname = '/auth/callback';
+      target.search = `?code=${encodeURIComponent(authCode!)}&next=${encodeURIComponent(path)}`;
+    }
+    return NextResponse.redirect(target);
+  }
+
   if (!session) {
     if (isPublic) return response;
     const signin = request.nextUrl.clone();

@@ -118,9 +118,17 @@ discoverable from the code.
 5. **Authentication → Sign In / Providers → Google.** Enable, paste the client
    ID and secret.
 6. **Authentication → URL Configuration.** Site URL is the production origin.
-   Add both redirect URLs, or local sign-in silently bounces to production:
-   - `https://paytrackingapp.vercel.app/auth/callback`
-   - `http://localhost:3000/auth/callback`
+   Add BOTH redirect URLs — this is the step that actually bit:
+   - `https://paytrackingapp.vercel.app/**`
+   - `http://localhost:3000/**`
+
+   When a redirect is not on this list, Supabase does not error. It quietly
+   falls back to the Site URL, so the browser lands on `/?code=…` instead of
+   `/auth/callback?code=…`. The app used to discard that code and bounce to
+   the sign-in screen, which looks exactly like a broken login rather than a
+   missing allow-list entry. `proxy.ts` now forwards a stray code to the
+   callback so the sign-in still completes — but fix the list anyway, because
+   the fallback is one redirect slower and only works by luck.
 7. Anonymous sign-ins can stay enabled or not — the app no longer uses them.
    `scripts/shoot-v3.mjs` uses one to take screenshots, since Playwright
    cannot drive a Google consent screen.
