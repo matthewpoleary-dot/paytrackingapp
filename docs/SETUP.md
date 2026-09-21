@@ -96,3 +96,53 @@ supabase link --project-ref <ref>
 
 Nothing is connected on the claude.ai side yet. If you want Cowork sessions
 to query the live database later, connect Supabase there separately.
+
+## Google sign-in (v3)
+
+Worked out by hand on 2026-09-21. Written down because none of it is
+discoverable from the code.
+
+### Google Cloud
+
+1. **APIs & Services → OAuth consent screen.** User type **Internal**. This
+   is what restricts sign-in to `@tcd.ie` — there is no check in the app, and
+   there should not be one. Internal only works inside a Workspace org.
+2. **Credentials → Create credentials → OAuth client ID → Web application.**
+3. **Authorised redirect URI** — this is Supabase's callback, not the app's:
+   `https://<project-ref>.supabase.co/auth/v1/callback`
+   Getting this wrong is the usual cause of `redirect_uri_mismatch`.
+4. Copy the client ID and client secret.
+
+### Supabase
+
+5. **Authentication → Sign In / Providers → Google.** Enable, paste the client
+   ID and secret.
+6. **Authentication → URL Configuration.** Site URL is the production origin.
+   Add both redirect URLs, or local sign-in silently bounces to production:
+   - `https://paytrackingapp.vercel.app/auth/callback`
+   - `http://localhost:3000/auth/callback`
+7. Anonymous sign-ins can stay enabled or not — the app no longer uses them.
+   `scripts/shoot-v3.mjs` uses one to take screenshots, since Playwright
+   cannot drive a Google consent screen.
+
+### The graduation cliff
+
+The account is keyed to a TCD identity. When that expires, the Google account
+goes with it and the sign-in stops working — while the data stays, owned by a
+`user_id` nobody can authenticate as any more.
+
+The fix is Supabase identity linking: attach a personal Google account to the
+same user before the college one dies. Noted, not built. It needs doing
+before graduation, not after.
+
+## Anthropic (v3)
+
+`ANTHROPIC_API_KEY` in Vercel (all environments) and in `.env.local`. Server
+side only — never `NEXT_PUBLIC_`, because that would ship the key to the
+browser.
+
+Pull it locally with `npx vercel env pull .env.local` rather than copying it
+by hand.
+
+The key needs credit on the account. Without it the API returns a 400 and the
+AI tab shows the message; everything else in the app is unaffected.

@@ -5,20 +5,24 @@ import { SUPABASE_PUBLISHABLE_KEY, SUPABASE_URL, hasSupabaseEnv } from './env';
 /** Refresh this far ahead of expiry, so a request never races the deadline. */
 const REFRESH_WINDOW_SECONDS = 120;
 
+/** Reachable without a session. Everything else redirects to sign-in. */
+const PUBLIC_PATHS = ['/signin', '/auth/callback', '/auth/error'];
+
 /**
- * Keeps a session alive, and creates an anonymous one the first time anybody
- * arrives. There is no auth screen — but there is still a real user_id, so
- * every RLS policy is live from the first request, and an anonymous session
- * upgrades to a real account later without migrating a single row.
+ * Keeps a session alive and gates the app behind Google sign-in.
  *
- * Performance matters here more than anywhere else in the app: this runs
- * before EVERY page, so whatever it does is added to every navigation.
+ * v1 used an anonymous session so there was never a login wall. That was
+ * overturned on 2026-09-21: anonymous is device-bound, and this app now holds
+ * 18 months of pay and savings history that must survive a new phone. The RLS
+ * half of the original rule is untouched — every table still carries user_id
+ * and every policy is still forced.
  *
- * Calling auth.getUser() unconditionally — the usual pattern — costs a round
- * trip to Supabase on each one, which measured at 200-500ms and occasionally
- * 3s. So the network call is made only when it changes the outcome: when
- * there is no session at all, or when the one we have is about to expire.
- * Otherwise the cookie is already good and the page can get on with it.
+ * Performance matters here more than anywhere else, because this runs before
+ * EVERY page. Calling auth.getUser() unconditionally — the usual pattern —
+ * costs a round trip to Supabase each time, measured at 200-500ms and
+ * occasionally 3s. The network call is made only when it changes the outcome:
+ * when the session is missing or about to expire. Otherwise the cookie is
+ * already good and the page can get on with it.
  */
 export async function updateSession(request: NextRequest) {
   let response = NextResponse.next({ request });
@@ -45,15 +49,31 @@ export async function updateSession(request: NextRequest) {
   });
 
   // Reads the cookie; no network. Enough to answer "is there a session, and
-  // how long is it good for" — which is the only question being asked here.
-  // It is not used to authorise anything: RLS does that, in Postgres.
+  // how long is it good for", which is the only question asked here. It is
+  // not used to authorise anything — RLS does that, in Postgres.
   const {
     data: { session },
   } = await supabase.auth.getSession();
 
+  const path = request.nextUrl.pathname;
+  const isPublic = PUBLIC_PATHS.some((p) => path === p || path.startsWith(`${p}/`));
+
   if (!session) {
-    await supabase.auth.signInAnonymously();
-    return response;
+    if (isPublic) return response;
+    const signin = request.nextUrl.clone();
+    signin.pathname = '/signin';
+    signin.search = '';
+    // Where to land once they are back, so a shared link still works.
+    if (path !== '/') signin.searchParams.set('next', path + request.nextUrl.search);
+    return NextResponse.redirect(signin);
+  }
+
+  // Signed in: the sign-in screen is not somewhere to sit.
+  if (path === '/signin') {
+    const home = request.nextUrl.clone();
+    home.pathname = '/';
+    home.search = '';
+    return NextResponse.redirect(home);
   }
 
   const secondsLeft = (session.expires_at ?? 0) - Math.floor(Date.now() / 1000);

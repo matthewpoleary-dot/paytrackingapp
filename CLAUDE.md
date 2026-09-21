@@ -84,12 +84,14 @@ Decided 2026-09-20. Build exactly this; resist adding to it.
 - **Holiday tab.** Shift logging comes first — holiday figures are only as
   good as the shift history behind them, and on day one there isn't any.
   `docs/PAY-RULES.md` has the accrual rules ready for when it lands.
-- **Login.** No auth screen in v1. Use a Supabase anonymous session so
-  there is still a real `user_id` — every table carries it and every RLS
-  policy is live and tested from the first migration. An anonymous session
-  upgrades to a real account later without migrating any data. Do **not**
-  hardcode a user id or disable RLS "for now"; that is the version that
-  never gets fixed.
+- **Login.** ⚠️ **OVERTURNED 2026-09-21 — see v3 scope.** No auth screen in
+  v1. Use a Supabase anonymous session so there is still a real `user_id` —
+  every table carries it and every RLS policy is live and tested from the
+  first migration. An anonymous session upgrades to a real account later
+  without migrating any data. Do **not** hardcode a user id or disable RLS
+  "for now"; that is the version that never gets fixed.
+  *(The RLS half of this still holds absolutely. Only the anonymous-session
+  half is overturned.)*
 - `actual_paid` on the pay period (see Scope).
 - Shift `source` beyond `manual`.
 
@@ -111,13 +113,94 @@ recorded and last month would quietly become worth more than it was — which
 would destroy the app as evidence. The same column doubles as the per-shift
 override.
 
+## v3 scope
+
+Decided 2026-09-21. Tally stops being a pay calculator and becomes a
+savings hub for one part-time worker saving for Erasmus. Three tabs:
+**Shifts** (what exists today), **Budget**, **AI**.
+
+Everything is in service of one sentence the app must always be able to
+say:
+
+> €4,200 by August. You're at €1,150. At the rate you're setting aside you
+> land in October — six weeks late. Six extra Sundays closes it.
+
+Shifts say what's coming in. Budget says what's going out. The goal is the
+deadline. The AI keeps that sentence current. **A feature that doesn't feed
+that sentence isn't in v3.**
+
+### The three overturned rules
+
+Marked inline above, listed here so there is one place to find them:
+
+1. **Anonymous sessions → Google sign-in.** Anonymous was device-bound, and
+   this app now holds 18 months of pay and savings history. Consent screen
+   is Internal (TCD Workspace), so only `@tcd.ie` accounts can sign in.
+2. **No login wall → there is a login wall.** Consequence of 1.
+3. **No bank integration → Revolut CSV import**, that one format only.
+
+### Also settled 2026-09-21
+
+- **Clean slate.** No data worth preserving. Existing anonymous rows may be
+  deleted; no migration path is built for them.
+- **The AI proposes; the user confirms.** Every write it makes is a card
+  the user taps. It never writes silently.
+- **Web search is on.** Without it the model answers "what's rent in
+  Bologna" from memory, which is the same failure as inventing a Sunday
+  multiplier. With it the figure carries a citation that gets stored.
+- **The goal is a cost breakdown, not a number.** Lines, each with an
+  amount and a confidence: `quoted` (you have a booking), `researched`
+  (found, with a citation), `guess`. The target is the sum, and it improves
+  as real numbers arrive.
+- **Streaks are out.** The weekly ritual is the cadence. A daily counter on
+  a data-entry chore rewards fabricated entries, which would destroy the
+  log's value as evidence.
+
+### The rule that governs the AI
+
+**The model narrates. The code calculates.**
+
+Every euro figure the AI states must come back from a tool that computed it
+in `lib/pay` or `lib/budget`. The model never totals a list of
+transactions, pro-ratas a monthly figure, or works out weeks-to-target
+itself. Rule 4 below exists because Claude asserted a pay figure from
+memory once already in this project; an AI inventing a budget number is the
+same bug wearing a different hat.
+
+Any figure about the outside world — rent in a city, a flight price, an
+Erasmus+ grant rate — needs a `web_search` citation stored alongside it
+with the date checked, exactly as `docs/PAY-RULES.md` does. If the model
+can't source it, the line is a `guess` and says so.
+
+**The competitor for the AI tab is claude.ai itself.** If the user would
+get a better answer by opening claude.ai and typing, the tab has failed. It
+wins only by knowing what claude.ai cannot: their roster, their rate, their
+goal, their spending. So the tool surface is the build and the chat box is
+the easy part.
+
+### Memory is the schema, not the transcript
+
+"Remembers me" means durable facts live in rows the rest of the app can
+compute with — destination, departure month, rent, the buffer the user
+won't dip below. A transcript nobody can query is not memory. The
+conversation is stored too, but it is the log, not the state.
+
+### Out of v3
+
+Holiday tab. Payslip parsing, OCR, open banking. Multi-user sharing beyond
+the RLS that already exists. Streaks. PAYE/USC/PRSI. Identity linking for
+the graduation cliff — the account is keyed to a TCD identity that expires;
+noted as a follow-up, not built.
+
 ## The bar
 
 **The competitor is the Notes app.** If logging a shift is slower than
 typing "fri 6-close" into Notes, this loses. That constraint outranks
 almost everything else:
 
-- No login wall before the first number appears.
+- ⚠️ **OVERTURNED 2026-09-21 — see v3 scope.** No login wall before the
+  first number appears. *(There is now a sign-in wall. The four-second bar
+  still governs everything behind it.)*
 - No onboarding flow, no employer setup wizard.
 - Usable in about four seconds from cold.
 - Most shifts repeat — learn the usual shape and offer it for confirmation
@@ -130,9 +213,12 @@ that holds user data carries a `user_id` and an RLS policy, even while
 there's exactly one user. Do not "simplify" this away — the point is that
 sharing it later isn't a rewrite.
 
-**No payslip parsing.** The app computes what you're owed; the user
-compares that to what actually landed. There is no payslip import, no OCR,
-no bank integration.
+**No payslip parsing.** ⚠️ **PARTLY OVERTURNED 2026-09-21 — see v3 scope.**
+The app computes what you're owed; the user compares that to what actually
+landed. There is no payslip import, no OCR, no bank integration.
+*(v3 adds Revolut CSV import of the user's own statement, hardcoded to that
+one format. Payslip parsing, OCR, PDFs, open banking and aggregators all
+remain out — permanently, not "not yet".)*
 
 But: pay periods carry a nullable `actual_paid`. One optional field the
 user can fill or ignore. Empty, the app is a calculator; filled, it becomes

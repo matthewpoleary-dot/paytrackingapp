@@ -31,6 +31,7 @@ import {
 } from '@/app/_components/MonthCalendar';
 import { RangeTabs } from '@/app/_components/RangeTabs';
 import { Wordmark } from '@/app/_components/Wordmark';
+import { TabBar } from '@/app/_components/TabBar';
 import {
   ChartLegend,
   DayOfWeekBars,
@@ -370,7 +371,7 @@ export default async function Dashboard(props: PageProps<'/'>) {
         </Link>
       </section>
 
-      <div className="h-8" />
+      <TabBar active="shifts" />
     </Screen>
   );
 }

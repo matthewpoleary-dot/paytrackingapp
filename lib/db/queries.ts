@@ -3,6 +3,7 @@ import { hasSupabaseEnv } from '@/lib/supabase/env';
 import { nextPeriodStart, periodEnd, previousPeriodStart } from '@/lib/pay/period';
 import { addDays, dublinDate } from '@/lib/time/dublin';
 import type { Settings, Shift } from '@/lib/pay/types';
+import type { GoalLine, Outgoing, ProfileFact, Txn } from '@/lib/budget/types';
 
 /**
  * Server-side reads. Every one of these runs as the signed-in anonymous user,
@@ -213,6 +214,58 @@ export async function getContributions(): Promise<Contribution[]> {
     .from('contribution')
     .select('id, amount_cents, contributed_on, note')
     .order('contributed_on', { ascending: true });
+  if (error) return [];
+  return data ?? [];
+}
+
+// ---------------------------------------------------------------------------
+// v3: budget, memory and conversations
+// ---------------------------------------------------------------------------
+
+export async function getGoalLines(goalId: string): Promise<GoalLine[]> {
+  if (!hasSupabaseEnv()) return [];
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from('goal_line')
+    .select('id, goal_id, label, amount_cents, confidence, source_url, source_checked_on, sort_order')
+    .eq('goal_id', goalId)
+    .order('sort_order', { ascending: true })
+    .order('created_at', { ascending: true });
+  if (error) return [];
+  return data ?? [];
+}
+
+export async function getOutgoings(): Promise<Outgoing[]> {
+  if (!hasSupabaseEnv()) return [];
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from('outgoing')
+    .select('id, label, amount_cents, cadence, category, started_on, ended_on')
+    .order('amount_cents', { ascending: false });
+  if (error) return [];
+  return data ?? [];
+}
+
+export async function getTxns(from: string, to: string): Promise<Txn[]> {
+  if (!hasSupabaseEnv()) return [];
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from('txn')
+    .select('id, posted_on, description, amount_cents, category, categorised_by, source, external_id')
+    .gte('posted_on', from)
+    .lte('posted_on', to)
+    .order('posted_on', { ascending: false });
+  if (error) return [];
+  return data ?? [];
+}
+
+export async function getProfileFacts(): Promise<ProfileFact[]> {
+  if (!hasSupabaseEnv()) return [];
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from('profile_fact')
+    .select('id, key, value, learned_on, confirmed_at, source')
+    .order('key', { ascending: true });
   if (error) return [];
   return data ?? [];
 }

@@ -276,3 +276,303 @@ test('RLS: one user cannot reach another user\'s goal or contributions', async (
     assert.equal(after.length, 1, 'LEAK: alice\'s contribution is gone');
   });
 });
+
+test("RLS: one user cannot reach another user's budget, memory or conversations", async (t) => {
+  const alice = await anonUser('alice');
+  const bob = await anonUser('bob');
+  assert.notEqual(alice.id, bob.id, 'the two sessions must be different users');
+
+  // --- Alice builds a full v3 footprint -----------------------------------
+
+  const { data: goal, error: goalErr } = await alice.client
+    .from('goal')
+    .insert({ user_id: alice.id, name: 'Erasmus', target_cents: 420000 })
+    .select()
+    .single();
+  assert.equal(goalErr, null, `alice could not write her own goal: ${goalErr?.message}`);
+
+  const { data: line, error: lineErr } = await alice.client
+    .from('goal_line')
+    .insert({
+      user_id: alice.id,
+      goal_id: goal.id,
+      label: 'Flights',
+      amount_cents: 24000,
+      confidence: 'researched',
+      source_url: 'https://example.com/flights',
+      source_checked_on: '2026-09-21',
+    })
+    .select()
+    .single();
+  assert.equal(lineErr, null, `alice could not write her own goal line: ${lineErr?.message}`);
+
+  const { data: outgoing, error: outErr } = await alice.client
+    .from('outgoing')
+    .insert({
+      user_id: alice.id,
+      label: 'Rent',
+      amount_cents: 65000,
+      cadence: 'monthly',
+      category: 'rent',
+      started_on: '2026-09-01',
+    })
+    .select()
+    .single();
+  assert.equal(outErr, null, `alice could not write her own outgoing: ${outErr?.message}`);
+
+  const { data: txn, error: txnErr } = await alice.client
+    .from('txn')
+    .insert({
+      user_id: alice.id,
+      posted_on: '2026-09-20',
+      description: 'Tesco',
+      amount_cents: -3250,
+      category: 'groceries',
+      source: 'revolut_csv',
+      external_id: 'rev-0001',
+      categorised_by: 'model',
+    })
+    .select()
+    .single();
+  assert.equal(txnErr, null, `alice could not write her own transaction: ${txnErr?.message}`);
+
+  const { data: fact, error: factErr } = await alice.client
+    .from('profile_fact')
+    .insert({
+      user_id: alice.id,
+      key: 'destination',
+      value: 'Bologna',
+      source: 'user',
+      confirmed_at: new Date().toISOString(),
+    })
+    .select()
+    .single();
+  assert.equal(factErr, null, `alice could not write her own profile fact: ${factErr?.message}`);
+
+  const { data: conversation, error: convErr } = await alice.client
+    .from('conversation')
+    .insert({ user_id: alice.id, title: 'Erasmus planning' })
+    .select()
+    .single();
+  assert.equal(convErr, null, `alice could not start her own conversation: ${convErr?.message}`);
+
+  const { data: message, error: msgErr } = await alice.client
+    .from('ai_message')
+    .insert({
+      user_id: alice.id,
+      conversation_id: conversation.id,
+      role: 'user',
+      content: [{ type: 'text', text: 'How much is rent in Bologna?' }],
+    })
+    .select()
+    .single();
+  assert.equal(msgErr, null, `alice could not write her own message: ${msgErr?.message}`);
+
+  const TABLES = ['goal_line', 'outgoing', 'txn', 'profile_fact', 'conversation', 'ai_message'];
+
+  // --- Positive half: the rows exist and their owner can see them ---------
+
+  await t.test('alice can read her own v3 rows', async () => {
+    for (const table of TABLES) {
+      const { data, error } = await alice.client.from(table).select('id');
+      assert.equal(error, null, `alice got an error reading ${table}: ${error?.message}`);
+      assert.ok(
+        data.length > 0,
+        `alice sees no rows in ${table} — the negative assertions below would be vacuous`,
+      );
+    }
+  });
+
+  // --- Negative half -------------------------------------------------------
+
+  await t.test("bob cannot read any of alice's v3 rows", async () => {
+    for (const table of TABLES) {
+      const { data, error } = await bob.client.from(table).select('*');
+      assert.equal(error, null, `unexpected error reading ${table}: ${error?.message}`);
+      assert.deepEqual(data, [], `LEAK: bob can see ${data?.length} row(s) in ${table}`);
+    }
+  });
+
+  await t.test("bob cannot read alice's rows by primary key", async () => {
+    for (const [table, row] of [
+      ['goal_line', line],
+      ['outgoing', outgoing],
+      ['txn', txn],
+      ['profile_fact', fact],
+      ['conversation', conversation],
+      ['ai_message', message],
+    ]) {
+      const { data, error } = await bob.client.from(table).select('*').eq('id', row.id);
+      assert.equal(error, null);
+      assert.deepEqual(data, [], `LEAK: bob fetched alice's ${table} by primary key`);
+    }
+  });
+
+  await t.test('bob cannot read what the model wrote about alice', async () => {
+    // The conversation is the most sensitive thing here: it is the only place
+    // holding free text about someone's money.
+    const { data } = await bob.client
+      .from('ai_message')
+      .select('content')
+      .eq('conversation_id', conversation.id);
+    assert.deepEqual(data, [], "LEAK: bob can read alice's conversation");
+  });
+
+  await t.test('bob cannot attach rows to alice', async () => {
+    const attempts = [
+      ['goal_line', { user_id: alice.id, goal_id: goal.id, label: 'X', amount_cents: 100 }],
+      [
+        'outgoing',
+        {
+          user_id: alice.id,
+          label: 'X',
+          amount_cents: 100,
+          cadence: 'monthly',
+          started_on: '2026-09-01',
+        },
+      ],
+      ['txn', { user_id: alice.id, posted_on: '2026-09-21', description: 'X', amount_cents: -100 }],
+      ['profile_fact', { user_id: alice.id, key: 'k', value: 'v', source: 'model' }],
+      ['conversation', { user_id: alice.id, title: 'X' }],
+      [
+        'ai_message',
+        { user_id: alice.id, conversation_id: conversation.id, role: 'user', content: [] },
+      ],
+    ];
+    for (const [table, row] of attempts) {
+      const { error } = await bob.client.from(table).insert(row);
+      assert.ok(error, `LEAK: bob wrote a ${table} row under alice's user_id`);
+      assert.match(error.message, /row-level security/i, `${table}: wrong refusal`);
+    }
+  });
+
+  await t.test("bob cannot rewrite alice's goal line or its citation", async () => {
+    const { data, error } = await bob.client
+      .from('goal_line')
+      .update({ amount_cents: 1, source_url: 'https://evil.example' })
+      .eq('id', line.id)
+      .select();
+    assert.equal(error, null);
+    assert.deepEqual(data, [], "LEAK: bob updated alice's goal line");
+
+    const { data: after } = await alice.client
+      .from('goal_line')
+      .select('amount_cents, source_url')
+      .eq('id', line.id)
+      .single();
+    assert.equal(after.amount_cents, 24000, "LEAK: alice's figure was changed");
+    assert.equal(
+      after.source_url,
+      'https://example.com/flights',
+      "LEAK: alice's citation was changed",
+    );
+  });
+
+  await t.test("bob cannot delete alice's transactions or memory", async () => {
+    for (const [table, row] of [
+      ['txn', txn],
+      ['profile_fact', fact],
+    ]) {
+      const { data, error } = await bob.client.from(table).delete().eq('id', row.id).select();
+      assert.equal(error, null);
+      assert.deepEqual(data, [], `LEAK: bob deleted alice's ${table}`);
+
+      const { data: after } = await alice.client.from(table).select('id').eq('id', row.id);
+      assert.equal(after.length, 1, `LEAK: alice's ${table} row is gone`);
+    }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Constraints that are guarantees rather than requests. Not RLS, but they
+// protect the same thing: a figure the user could not stand over.
+// ---------------------------------------------------------------------------
+
+test('the schema refuses unsourced research and unconfirmed user facts', async (t) => {
+  const user = await anonUser('constraints');
+
+  const { data: goal } = await user.client
+    .from('goal')
+    .insert({ user_id: user.id, name: 'Erasmus', target_cents: 420000 })
+    .select()
+    .single();
+
+  await t.test('a researched line without a citation is rejected', async () => {
+    const { error } = await user.client.from('goal_line').insert({
+      user_id: user.id,
+      goal_id: goal.id,
+      label: 'Rent in Bologna',
+      amount_cents: 50000,
+      confidence: 'researched',
+    });
+    assert.ok(error, 'a researched figure was accepted with no source');
+    assert.match(error.message, /goal_line_researched_is_sourced|violates check/i);
+  });
+
+  await t.test('a guess needs no citation', async () => {
+    const { error } = await user.client.from('goal_line').insert({
+      user_id: user.id,
+      goal_id: goal.id,
+      label: 'Spending money',
+      amount_cents: 60000,
+      confidence: 'guess',
+    });
+    assert.equal(error, null, `a guess was wrongly rejected: ${error?.message}`);
+  });
+
+  await t.test('a user-sourced fact cannot be left unconfirmed', async () => {
+    const { error } = await user.client.from('profile_fact').insert({
+      user_id: user.id,
+      key: 'unconfirmed-user-fact',
+      value: 'x',
+      source: 'user',
+    });
+    assert.ok(error, 'a user fact was accepted without confirmation');
+    assert.match(error.message, /profile_fact_user_facts_are_confirmed|violates check/i);
+  });
+
+  await t.test('a model-sourced fact may be left unconfirmed', async () => {
+    const { error } = await user.client.from('profile_fact').insert({
+      user_id: user.id,
+      key: 'model-pending-fact',
+      value: 'Bologna',
+      source: 'model',
+    });
+    assert.equal(error, null, `a pending model fact was wrongly rejected: ${error?.message}`);
+  });
+
+  await t.test('re-importing the same statement line does not double-count', async () => {
+    const row = {
+      user_id: user.id,
+      posted_on: '2026-09-20',
+      description: 'Tesco',
+      amount_cents: -3250,
+      source: 'revolut_csv',
+      external_id: 'rev-dupe-001',
+    };
+    const first = await user.client.from('txn').insert(row);
+    assert.equal(first.error, null, `first import failed: ${first.error?.message}`);
+
+    const second = await user.client.from('txn').insert(row);
+    assert.ok(second.error, 'the same statement line imported twice');
+    assert.match(second.error.message, /duplicate key|txn_external_once/i);
+  });
+
+  await t.test('two hand-entered transactions may look identical', async () => {
+    // Null external_id is excluded from the unique index on purpose: buying
+    // the same coffee twice in a day is not a duplicate.
+    const row = {
+      user_id: user.id,
+      posted_on: '2026-09-20',
+      description: 'Coffee',
+      amount_cents: -350,
+      source: 'manual',
+    };
+    assert.equal((await user.client.from('txn').insert(row)).error, null);
+    assert.equal(
+      (await user.client.from('txn').insert(row)).error,
+      null,
+      'manual duplicates blocked',
+    );
+  });
+});

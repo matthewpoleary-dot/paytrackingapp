@@ -9,9 +9,11 @@
     "lint": "eslint",
     "test:rls": "node --env-file-if-exists=.env.local --test tests/rls.test.mjs",
     "test:domain": "node --import ./tests/register-alias.mjs --test tests/domain.test.mjs",
-    "test": "npm run test:domain && npm run test:rls"
+    "test": "npm run test:domain && npm run test:budget && npm run test:rls",
+    "test:budget": "node --import ./tests/register-alias.mjs --test tests/budget.test.mjs"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.127.0",
     "@supabase/ssr": "^0.12.7",
     "@supabase/supabase-js": "^2.116.0",
     "next": "16.3.5",
