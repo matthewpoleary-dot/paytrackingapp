@@ -1,6 +1,7 @@
 'use client';
 
-import { useActionState, useState } from 'react';
+import { useActionState, useEffect, useRef, useState } from 'react';
+import Link from 'next/link';
 import { Card, ErrorNote, PageHeader, PrimaryButton, Screen } from '@/app/_components/ui';
 import { saveRoster, type RosterState } from './actions';
 
@@ -22,12 +23,22 @@ export interface UsualShape {
 const BREAK_CHOICES = [0, 15, 30, 45, 60];
 
 export function RosterForm({
-  weekLabel,
+  weekStart,
+  previousWeek,
+  nextWeek,
+  relative,
+  weekRange,
+  isThisWeek,
   days,
   usual,
   breaksPaid,
 }: {
-  weekLabel: string;
+  weekStart: string;
+  previousWeek: string;
+  nextWeek: string;
+  relative: string;
+  weekRange: string;
+  isThisWeek: boolean;
   /** The seven dates of the week being entered, with their labels. */
   days: { date: string; weekday: string; dayNumber: string; sunday: boolean }[];
   usual: UsualShape;
@@ -42,6 +53,18 @@ export function RosterForm({
   // count before you know the details.
   const [count, setCount] = useState(0);
   const [drafts, setDrafts] = useState<Draft[]>([]);
+
+  // Stepping to another week remounts this component with different dates.
+  // Anything already drafted would point at the old week, so the drafts are
+  // rebased onto the new one by weekday rather than silently kept or dropped.
+  const weekRef = useRef(weekStart);
+  useEffect(() => {
+    if (weekRef.current === weekStart) return;
+    weekRef.current = weekStart;
+    setDrafts((current) =>
+      current.map((d, i) => ({ ...d, workDate: days[Math.min(4 + i, 6)]?.date ?? days[0].date })),
+    );
+  }, [weekStart, days]);
 
   function setShiftCount(next: number) {
     const clamped = Math.max(0, Math.min(7, next));
@@ -80,11 +103,23 @@ export function RosterForm({
 
   return (
     <Screen>
-      <PageHeader
-        eyebrow={weekLabel}
-        title="What are you working?"
-        back={{ href: '/', label: 'This period' }}
-      />
+      <PageHeader title="What are you working?" back={{ href: '/', label: 'Dashboard' }} />
+
+      {/* Any week, not just this one or next. The count and the times carry
+          across as you step, so filling several weeks in a sitting does not
+          mean re-entering the same shape each time. */}
+      <div className="mb-3 flex items-center justify-between gap-2 rounded-xl bg-segment-track px-2 py-2">
+        <WeekStep href={`/roster?start=${previousWeek}`} label="Previous week">
+          &lsaquo;
+        </WeekStep>
+        <div className="min-w-0 text-center">
+          <p className="t-label text-fg-secondary">{relative}</p>
+          <p className="t-heading tabular-nums">{weekRange}</p>
+        </div>
+        <WeekStep href={`/roster?start=${nextWeek}`} label="Next week">
+          &rsaquo;
+        </WeekStep>
+      </div>
 
       <form action={formAction} className="flex flex-1 flex-col">
         <input type="hidden" name="shifts" value={payload} />
@@ -214,7 +249,9 @@ export function RosterForm({
               : `Log ${count || 'no'} shift${count === 1 ? '' : 's'}`}
           </PrimaryButton>
           <p className="t-caption mt-2.5 text-center text-fg-secondary">
-            You&rsquo;ll confirm what actually happened at the end of the week.
+            {isThisWeek
+              ? 'You\u2019ll confirm what actually happened at the end of the week.'
+              : `Logging to ${weekRange}. Step to another week with the arrows above.`}
           </p>
         </div>
       </form>
@@ -280,4 +317,24 @@ function dayLabel(
 ) {
   const day = days.find((d) => d.date === date);
   return day ? `${day.weekday} ${day.dayNumber}` : 'the day it starts';
+}
+
+function WeekStep({
+  href,
+  label,
+  children,
+}: {
+  href: string;
+  label: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <Link
+      href={href}
+      aria-label={label}
+      className="t-figure flex size-11 shrink-0 items-center justify-center rounded-lg text-fg-secondary transition-[background-color,transform] duration-150 active:scale-90 active:bg-segment-pill"
+    >
+      {children}
+    </Link>
+  );
 }

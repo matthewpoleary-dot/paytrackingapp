@@ -61,7 +61,7 @@ await page.waitForURL(/\/roster/, { timeout: 25000 });
 for (let i = 0; i < 2; i++) await page.getByLabel('One more shift').click();
 await shot('3-roster-next');
 await page.getByRole('button', { name: /Log 2 shifts/ }).click();
-await page.waitForURL(new RegExp(String.raw`/period\?period=`), { timeout: 25000 });
+await page.waitForURL(new RegExp(String.raw`/\?range=week`), { timeout: 25000 });
 await settle();
 assert(
   (await page.locator('text=Nothing logged for this period').count()) === 0,
@@ -91,7 +91,7 @@ const lastMonday = (() => {
 await page.goto(`${BASE}/roster?start=${lastMonday}`, { waitUntil: 'networkidle' });
 for (let i = 0; i < 3; i++) await page.getByLabel('One more shift').click();
 await page.getByRole('button', { name: /Log 3 shifts/ }).click();
-await page.waitForURL(new RegExp(String.raw`/period\?period=`), { timeout: 25000 });
+await page.waitForURL(new RegExp(String.raw`/\?range=week`), { timeout: 25000 });
 await shot('5-estimated');
 
 // --- Confirmation -----------------------------------------------------------

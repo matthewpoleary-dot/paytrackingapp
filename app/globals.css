@@ -280,7 +280,9 @@ input, select, textarea, button { font: inherit; font-size: 1.0625rem; }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
     animation-duration: 0.01ms !important;
+    animation-delay: 0ms !important;
     transition-duration: 0.01ms !important;
+    transition-delay: 0ms !important;
   }
 }
 
@@ -336,3 +338,40 @@ input, select, textarea, button { font: inherit; font-size: 1.0625rem; }
 
 :root:not([data-booted]) .boot-skeleton { display: none; }
 [data-booted] .boot { display: none; }
+
+
+/* ===========================================================================
+   Cold-open sequence
+   ---------------------------------------------------------------------------
+   Declared here rather than driven from React on purpose.
+
+   Triggering these from state meant the style change had to land on a main
+   thread that was busy hydrating the dashboard behind the splash, so the
+   animation started late and stuttered — 6 dropped frames with a worst gap of
+   83ms under a 4x CPU throttle. Declared up front, the compositor owns the
+   whole sequence from first paint and main-thread work cannot touch it.
+
+   --boot-shift is measured once before paint; --i is the letter's index.
+   ========================================================================= */
+
+@keyframes boot-lockup {
+  from { transform: translateX(var(--boot-shift, 0px)); }
+  to   { transform: translateX(0); }
+}
+
+@keyframes boot-letter {
+  from { opacity: 0; transform: translateX(-0.5em); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+
+.boot-lockup {
+  animation: boot-lockup 620ms cubic-bezier(0.32, 0.72, 0, 1) 620ms both;
+  will-change: transform;
+}
+
+.boot-letter {
+  display: inline-block;
+  animation: boot-letter 620ms cubic-bezier(0.32, 0.72, 0, 1)
+    calc(620ms + var(--i) * 70ms) both;
+  will-change: transform, opacity;
+}

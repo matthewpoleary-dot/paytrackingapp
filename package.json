@@ -7,7 +7,9 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "test:rls": "node --env-file-if-exists=.env.local --test tests/rls.test.mjs"
+    "test:rls": "node --env-file-if-exists=.env.local --test tests/rls.test.mjs",
+    "test:domain": "node --import ./tests/register-alias.mjs --test tests/domain.test.mjs",
+    "test": "npm run test:domain && npm run test:rls"
   },
   "dependencies": {
     "@supabase/ssr": "^0.12.7",
