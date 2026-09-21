@@ -3,6 +3,20 @@
 import { useEffect, useRef, useState } from 'react';
 
 /**
+ * How long the cold-open screen stays up, at minimum.
+ *
+ * This is the one place in the app that deliberately costs time, so it is
+ * worth being honest about. Tied strictly to real loading it was invisible:
+ * production serves the dashboard with a 21ms TTFB, so it painted for about
+ * a frame and vanished. A front door nobody sees is not a front door.
+ *
+ * 1100ms is long enough to read the mark and watch the timecode move, short
+ * enough not to grate on an app opened daily. It is paid once per session,
+ * on cold open only — never on an in-app navigation.
+ */
+const MINIMUM_MS = 1100;
+
+/**
  * The cold-open screen.
  *
  * Modelled on presterly.com: a full-bleed field, nothing in the middle but a
@@ -10,17 +24,47 @@ import { useEffect, useRef, useState } from 'react';
  * spinner, no progress bar, no logo animation — the restraint is the point.
  *
  * The counter is a timecode: hours, minutes, seconds, frames at 30fps. It
- * counts ELAPSED time, which is the only honest thing it could count. This
- * app refuses to show an estimate as a fact; a bar filling to a made-up
- * percentage, or a money figure ticking up to a number nobody has computed
- * yet, would be the same lie in a nicer coat.
+ * counts ELAPSED time, which is the only honest thing it could count. A bar
+ * filling to a made-up percentage, or a money figure ticking up to a number
+ * nobody has computed yet, would be the same lie this app spends the rest of
+ * its surface refusing to tell.
  *
- * It never delays anything. It lives in loading.tsx, so it is on screen for
- * exactly as long as the data actually takes and not a frame longer.
+ * It lives in the root layout rather than in loading.tsx. Inside the Suspense
+ * fallback it was torn down the instant the data arrived, which is precisely
+ * why it could never be held on screen.
  */
 export function Boot() {
   const [frames, setFrames] = useState(0);
   const start = useRef<number | null>(null);
+
+  // Dismiss on the later of: the minimum elapsing, and the page being ready.
+  // Whichever is slower wins, so a slow load is never cut short and a fast
+  // one still gets its moment.
+  useEffect(() => {
+    const minimum = new Promise<void>((resolve) => setTimeout(resolve, MINIMUM_MS));
+    const ready =
+      document.readyState === 'complete'
+        ? Promise.resolve()
+        : new Promise<void>((resolve) =>
+            window.addEventListener('load', () => resolve(), { once: true }),
+          );
+
+    let cancelled = false;
+    void Promise.all([minimum, ready]).then(() => {
+      if (cancelled) return;
+      try {
+        sessionStorage.setItem('tally.booted', '1');
+      } catch {
+        // Private mode or blocked storage: the screen simply shows again next
+        // time. Harmless.
+      }
+      document.documentElement.setAttribute('data-booted', '');
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   useEffect(() => {
     // A ticking counter is motion. Under reduced motion it holds at zero
@@ -72,29 +116,4 @@ export function Boot() {
       </span>
     </div>
   );
-}
-
-/**
- * Marks the session as booted once the app has actually rendered.
- *
- * Without this the cold-open screen would reappear on every in-app
- * navigation, where a full-bleed takeover is exactly the wrong thing — a
- * skeleton that holds the layout is better there.
- *
- * Mounted by the PAGE, never the layout. In the layout it ran during
- * loading.tsx as well, setting the flag while the cold-open screen was still
- * on screen and hiding it mid-load — which left a blank field.
- */
-export function BootFlag() {
-  useEffect(() => {
-    try {
-      sessionStorage.setItem('tally.booted', '1');
-    } catch {
-      // Private mode or blocked storage: the cold-open screen simply shows
-      // again next time. Harmless.
-    }
-    document.documentElement.setAttribute('data-booted', '');
-  }, []);
-
-  return null;
 }

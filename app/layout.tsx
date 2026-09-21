@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from 'next';
 import { Geist } from 'next/font/google';
 import './globals.css';
+import { Boot } from './_components/Boot';
 
 // A neutral grotesk in the spirit of the reference's Uncut Sans. Variable, so
 // the 350/450/550 weights the type ramp asks for are real weights rather than
@@ -46,6 +47,7 @@ export default function RootLayout({ children }: LayoutProps<'/'>) {
         <script dangerouslySetInnerHTML={{ __html: BOOTED_FLAG }} />
       </head>
       <body className="min-h-full">
+        <Boot />
         {children}
       </body>
     </html>

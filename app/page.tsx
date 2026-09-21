@@ -29,7 +29,6 @@ import {
 } from '@/app/_components/charts';
 import { project } from '@/lib/pay/projection';
 import { Wordmark } from '@/app/_components/Wordmark';
-import { BootFlag } from '@/app/_components/Boot';
 
 const MONTH_NAME = new Intl.DateTimeFormat('en-IE', { timeZone: 'UTC', month: 'long' });
 const SHORT_MONTH = new Intl.DateTimeFormat('en-IE', { timeZone: 'UTC', month: 'short' });
@@ -143,9 +142,6 @@ export default async function Dashboard(props: PageProps<'/'>) {
 
   return (
     <Screen>
-      {/* Marks the session booted, so later navigations get the skeleton
-          rather than the cold-open takeover. */}
-      <BootFlag />
       <header className="mb-4 flex items-center justify-between gap-2">
         <h1><Wordmark /></h1>
         <Link href="/settings" className="t-caption min-h-9 px-1 pt-2 text-fg-secondary tabular-nums">
