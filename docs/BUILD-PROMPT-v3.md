@@ -56,9 +56,12 @@ Settled 2026-09-21. Three overturn rules in `CLAUDE.md`; they are marked.
    aggregator.**
 4. **The AI proposes; the user confirms.** Every write it makes is a card
    the user taps. It never writes silently.
-5. **Web search is on.** Without it the model answers "what's rent in
-   Bologna" from memory, which is the same failure as inventing a Sunday
-   multiplier. With it, the figure carries a citation that gets stored.
+5. **Web search is on, via Gemini's Google Search grounding.** Without it
+   the model answers "what's rent in Bologna" from memory, which is the same
+   failure as inventing a Sunday multiplier. With it, the figure carries a
+   citation that gets stored. Grounding is included in the free tier (5,000
+   grounded prompts a month on 3.x models), so no separate search API and no
+   second key.
 6. **The savings goal becomes a cost breakdown**, not a single number.
    Lines, each with an amount and a confidence: `quoted` (you have a
    booking), `researched` (found with a citation), `guess`. The target is
@@ -158,16 +161,42 @@ Propose-only write tools: `propose_goal_line`, `propose_outgoing`,
 `propose_profile_fact`, `propose_txn_category`. They return a proposal; they
 do not write.
 
-Plus the `web_search` server tool.
+Plus Google Search grounding, so external figures arrive with a citation
+that gets stored on the row.
 
-Server-side only — the API key never reaches the client. `claude-opus-5`,
-adaptive thinking, streaming, the SDK's tool runner, `strict: true` on the
-tools. The system prompt states the narrate-don't-calculate rule and that
+**Provider: Google Gemini, on the free tier.** Decided 2026-09-22 on cost.
+Read the two constraints below before writing any of it.
+
+- **Put the provider behind one module — `lib/ai/client.ts`.** Nothing else
+  in the app imports the SDK. The tool definitions, the propose-and-confirm
+  flow, the schema and the narrate-don't-calculate rule are all
+  provider-agnostic and must stay that way. Free tiers are the most volatile
+  part of this stack: in the last few months Cerebras became a paid trial,
+  GitHub Models shut down, Groq dropped Llama from its free plan, and
+  OpenRouter's free models went paid. Switching providers must cost one file.
+- **Server-side only.** The key is read in server actions and route
+  handlers, never a client component.
+
+Mechanics: SDK is `@google/genai` (**not** the older
+`@google/generative-ai`). Pin `<3.0.0` unless the project is on Node 22+ —
+3.0.0 raised the floor. Function calling uses `parametersJsonSchema` on the
+declarations. Stream the response.
+
+**Do not hardcode a model ID from memory.** Only Flash and Flash-Lite are on
+the free tier — Pro was removed from it in April 2026. Check
+`ai.google.dev` for the current Flash model and use that. Rule 4's
+discipline applies to model IDs as much as to pay rates.
+
+The system prompt states the narrate-don't-calculate rule and that
 unsourced external figures are `guess`es.
 
-Ask before adding `@anthropic-ai/sdk` — it is the one new runtime
-dependency and the working agreement requires asking. (It is expected; ask
-anyway.)
+Ask before adding `@google/genai` — it is the one new runtime dependency
+and the working agreement requires asking. (It is expected; ask anyway.)
+
+Free-tier limits to design against, not discover: roughly 5–15 requests per
+minute and about 1,000 requests a day. Fine for one person, but handle a 429
+with a message that says what happened rather than a spinner that never
+resolves.
 
 **7. The AI tab.** Streaming chat at 390px, persisted conversation,
 proposal cards that write only on a tap. Goal setup is a conversation: the
