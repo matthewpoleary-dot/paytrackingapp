@@ -32,6 +32,53 @@ It is the dominant surface today and it is not working. What replaces it is
 **not yours to invent** — a session that picks a palette unprompted is how
 this got generic in the first place.
 
+### Step 0 — the references Matthew picked
+
+Three screens were chosen as directional on 2026-09-22. Take the
+**principles**, not the pixels. What makes them work is structure and
+restraint, not their palettes.
+
+1. **A habit tracker, near-black with a yellow accent.** The palette was
+   explicitly rejected. What was liked: a row of three stats inside a card,
+   and actions sitting with the content they act on.
+2. **A white project dashboard.** Serif heading. A huge light-weight `22%`
+   with a small caption under it. Below that, cards that are **hairline
+   outlined, white on white** — not filled. Enormous whitespace.
+3. **A white health tracker with a single lilac card.** A **horizontal date
+   strip** with the selected day as a filled dark circle. Exactly one tinted
+   element on the screen.
+
+**What to take:**
+
+- **A light, near-neutral field.** All three sit on white or near-black —
+  none on a saturated colour. The forest green is a *coloured* background,
+  and that is most of why the app reads as themed and heavy.
+- **Hairline-outlined cards, or no card at all.** Reference 2 is proof that
+  grouped content does not need a filled container. Filled blocks of a
+  second colour are what made five cards fight each other.
+- **One accent, once or twice per screen.** The lilac card in reference 3
+  works *because* nothing else is tinted. That is the *not settled yet* rule
+  already in `CLAUDE.md`, implemented properly for once.
+- **A hero figure that genuinely dominates**, set large, light and tight,
+  with everything else deliberately small. Reference 2's `22%`.
+- **A serif for headings.** Two of the three use one. Generated design is
+  almost always all-sans, and this single choice does much of the work of
+  not looking generated. Propose a specific pairing; do not default to the
+  system stack.
+- **A horizontal date strip instead of the month grid** (reference 3). It
+  suits a weekly ritual, and it removes the 340px of empty calendar the
+  audit flagged.
+- **A bottom tab bar** — needed anyway for Shifts / Budget / Ask.
+
+**What NOT to take:** reference 1's dense stat triple. Three stats crammed
+in a row is dashboard vocabulary and pulls straight back toward the problem
+being fixed.
+
+**The trap:** references 1 and 2 both contain cards, so "cards are fine" is
+the wrong lesson. They work because of contrast hierarchy, hairline borders
+and whitespace. Copy the shape without those and it is card soup in a new
+colour.
+
 ### Step 1 — propose, then STOP
 
 Produce **three complete palette directions**. For each one:
@@ -41,8 +88,9 @@ Produce **three complete palette directions**. For each one:
   `--fg-tertiary`, `--accent`, `--attention`, `--positive`, `--critical`,
   `--separator`, `--border`.
 - **A named real-world reference** — a site, a product, a physical object.
-  "Warm neutral" is not a reference. `tighsauna.com` was, which is why the
-  original direction had a spine.
+  "Warm neutral" is not a reference. Anchor it to Step 0: light near-neutral
+  field, one accent, hairline separation. One of the three may keep a
+  near-black world in the spirit of reference 1, but without its yellow.
 - **Contrast for every text token against its real surface, alpha
   composited, as a table.** Small text clears 4.5:1 or the direction is
   rejected. Check the script in; do not eyeball it.
@@ -68,6 +116,10 @@ These are not up for redesign:
   important signal.
 - **Two complete worlds**, light and dark, each designed and each audited.
   The current build audited one and shipped both.
+- **A type pairing, proposed explicitly.** A serif for headings against the
+  existing sans for figures and captions, per Step 0. Name the faces and
+  show them at 390px; the system stack is the default that reads as
+  generated.
 
 ### Step 2 — after the palette is chosen
 
