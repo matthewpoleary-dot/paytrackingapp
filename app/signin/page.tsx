@@ -38,7 +38,7 @@ export default async function SignInPage(props: PageProps<'/signin'>) {
         </form>
 
         <p className="t-caption mt-3 text-center text-fg-secondary">
-          Your TCD account. Nobody else can see your pay.
+          Nobody else can see your pay.
         </p>
       </div>
 

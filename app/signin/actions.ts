@@ -5,13 +5,6 @@ import { redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
 
 /**
- * Starts the Google flow.
- *
- * The consent screen is Internal to the TCD Workspace, so only @tcd.ie
- * accounts can get through it — the restriction lives in Google Cloud rather
- * than in a check here, which is the right place for it.
- */
-/**
  * Where Supabase must send the browser back to.
  *
  * This has to be absolute. A relative value is not rejected — Supabase
@@ -36,6 +29,15 @@ async function resolveOrigin(): Promise<string> {
   throw new Error('Cannot determine the request origin, so the OAuth redirect would be relative.');
 }
 
+/**
+ * Starts the Google flow.
+ *
+ * Any Google account (decided 2026-09-22, replacing a TCD-only consent
+ * screen). There is deliberately no `hd` parameter and no domain check
+ * here: a restriction enforced in the client is not one, and this app no
+ * longer wants a restriction at all. It also removes the graduation cliff,
+ * where the account was keyed to an identity that expires.
+ */
 export async function signInWithGoogle(formData: FormData) {
   const nextPath = String(formData.get('next') ?? '/');
   const origin = await resolveOrigin();

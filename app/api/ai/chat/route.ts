@@ -1,8 +1,12 @@
-import Anthropic from '@anthropic-ai/sdk';
 import { createClient } from '@/lib/supabase/server';
 import { buildSystemPrompt, runTool, TOOLS } from '@/lib/ai/tools';
+import { generate, hasModelKey } from '@/lib/ai/client';
+import { RateLimited, type Part, type Turn } from '@/lib/ai/types';
 
 export const maxDuration = 120;
+
+/** Enough for a plan that needs several lookups; short enough to end. */
+const MAX_TURNS = 12;
 
 /**
  * The chat endpoint.
@@ -10,9 +14,10 @@ export const maxDuration = 120;
  * Server-side only: the API key never reaches the browser, and every tool
  * runs here with the user's own Supabase session so RLS scopes the reads.
  *
- * Streams newline-delimited JSON rather than the SDK's raw event stream —
- * the client only needs four things (text, a tool starting, a tool result,
- * done), and translating here keeps the rendering code small.
+ * Streams newline-delimited JSON rather than a provider's own event stream.
+ * The client needs six things — text, a tool starting, a tool result,
+ * citations, done, an error — and translating here keeps both the rendering
+ * code small and the provider swappable.
  */
 export async function POST(request: Request) {
   const supabase = await createClient();
@@ -21,8 +26,12 @@ export async function POST(request: Request) {
   } = await supabase.auth.getUser();
   if (!user) return new Response('Unauthorised', { status: 401 });
 
-  const apiKey = process.env.ANTHROPIC_API_KEY;
-  if (!apiKey) return new Response('ANTHROPIC_API_KEY is not set', { status: 500 });
+  if (!hasModelKey()) {
+    return new Response(
+      'GEMINI_API_KEY is not set. Add it to .env.local — server-side, never NEXT_PUBLIC_.',
+      { status: 500 },
+    );
+  }
 
   const { conversationId, message } = (await request.json()) as {
     conversationId?: string;
@@ -42,26 +51,25 @@ export async function POST(request: Request) {
   }
   if (!threadId) return new Response('Could not start a conversation', { status: 500 });
 
-  // Replay the thread so the model has the history. The full content blocks
-  // are stored, so tool uses and results replay exactly as they happened.
+  // Replay the thread so the model has the history. Parts are stored in the
+  // neutral shape, so a provider change does not strand the transcript.
   const { data: history } = await supabase
     .from('ai_message')
     .select('role, content')
     .eq('conversation_id', threadId)
     .order('created_at', { ascending: true });
 
-  const messages: Anthropic.MessageParam[] = (history ?? []).map((m) => ({
-    role: m.role as 'user' | 'assistant',
-    content: m.content as Anthropic.ContentBlockParam[],
+  const turns: Turn[] = (history ?? []).map((m) => ({
+    role: m.role === 'assistant' ? 'model' : 'user',
+    parts: m.content as Part[],
   }));
 
-  const userBlocks: Anthropic.ContentBlockParam[] = [{ type: 'text', text: message }];
-  messages.push({ role: 'user', content: userBlocks });
+  const userParts: Part[] = [{ kind: 'text', text: message }];
+  turns.push({ role: 'user', parts: userParts });
   await supabase
     .from('ai_message')
-    .insert({ user_id: user.id, conversation_id: threadId, role: 'user', content: userBlocks });
+    .insert({ user_id: user.id, conversation_id: threadId, role: 'user', content: userParts });
 
-  const anthropic = new Anthropic({ apiKey });
   const system = await buildSystemPrompt();
 
   const encoder = new TextEncoder();
@@ -74,58 +82,44 @@ export async function POST(request: Request) {
         send({ type: 'conversation', id: threadId });
 
         // The agentic loop. Runs until the model stops asking for tools.
-        for (let turn = 0; turn < 12; turn++) {
-          const assistantBlocks: Anthropic.ContentBlockParam[] = [];
-
-          const response = anthropic.messages.stream({
-            model: 'claude-opus-5',
-            max_tokens: 4096,
-            // Adaptive: the model decides how much to think, so a "what did I
-            // earn" question stays fast while planning a budget can take its
-            // time.
-            thinking: { type: 'adaptive' },
+        for (let turn = 0; turn < MAX_TURNS; turn++) {
+          const reply = await generate({
             system,
-            tools: [
-              ...TOOLS,
-              // Without this the model answers "what's rent in Bologna" from
-              // memory, which is the same failure as inventing a pay rule.
-              {
-                type: 'web_search_20250305',
-                name: 'web_search',
-                max_uses: 5,
-              } as unknown as Anthropic.Tool,
-            ],
-            messages,
+            turns,
+            tools: TOOLS,
+            onText: (text) => send({ type: 'text', text }),
           });
 
-          response.on('text', (delta) => send({ type: 'text', text: delta }));
+          const modelParts: Part[] = [];
+          if (reply.text) modelParts.push({ kind: 'text', text: reply.text });
+          for (const call of reply.calls) {
+            modelParts.push({ kind: 'call', id: call.id, name: call.name, args: call.args });
+          }
 
-          const final = await response.finalMessage();
-          assistantBlocks.push(...(final.content as Anthropic.ContentBlockParam[]));
-
-          await supabase.from('ai_message').insert({
-            user_id: user.id,
-            conversation_id: threadId,
-            role: 'assistant',
-            content: assistantBlocks,
-          });
-          messages.push({ role: 'assistant', content: assistantBlocks });
-
-          const toolUses = final.content.filter(
-            (b): b is Anthropic.ToolUseBlock => b.type === 'tool_use',
-          );
-          if (toolUses.length === 0) break;
-
-          const results: Anthropic.ContentBlockParam[] = [];
-          for (const use of toolUses) {
-            send({ type: 'tool', name: use.name });
-            const output = await runTool(use.name, use.input as Record<string, unknown>);
-            send({ type: 'tool_result', name: use.name, id: use.id, output });
-            results.push({
-              type: 'tool_result',
-              tool_use_id: use.id,
-              content: JSON.stringify(output),
+          // A turn with nothing in it would replay as an empty message and be
+          // rejected on the next request.
+          if (modelParts.length > 0) {
+            await supabase.from('ai_message').insert({
+              user_id: user.id,
+              conversation_id: threadId,
+              role: 'assistant',
+              content: modelParts,
             });
+            turns.push({ role: 'model', parts: modelParts });
+          }
+
+          // Sources the model actually read, with the date checked, so a
+          // figure about the outside world can be stored with its citation.
+          if (reply.citations.length > 0) send({ type: 'citations', citations: reply.citations });
+
+          if (reply.calls.length === 0) break;
+
+          const results: Part[] = [];
+          for (const call of reply.calls) {
+            send({ type: 'tool', name: call.name });
+            const output = await runTool(call.name, call.args);
+            send({ type: 'tool_result', name: call.name, id: call.id, output });
+            results.push({ kind: 'result', id: call.id, name: call.name, output });
           }
 
           await supabase.from('ai_message').insert({
@@ -134,7 +128,7 @@ export async function POST(request: Request) {
             role: 'user',
             content: results,
           });
-          messages.push({ role: 'user', content: results });
+          turns.push({ role: 'user', parts: results });
         }
 
         await supabase
@@ -144,10 +138,21 @@ export async function POST(request: Request) {
 
         send({ type: 'done' });
       } catch (error) {
-        send({
-          type: 'error',
-          message: error instanceof Error ? error.message : 'Something went wrong',
-        });
+        // A quota error that reaches the user as a stalled spinner is
+        // indistinguishable from the app being broken, so it says what it is.
+        if (error instanceof RateLimited) {
+          send({
+            type: 'error',
+            kind: 'rate_limit',
+            message: error.message,
+            retryAfterSeconds: error.retryAfterSeconds,
+          });
+        } else {
+          send({
+            type: 'error',
+            message: error instanceof Error ? error.message : 'Something went wrong',
+          });
+        }
       } finally {
         controller.close();
       }

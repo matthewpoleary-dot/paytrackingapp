@@ -12,12 +12,19 @@ interface Proposal {
   reasoning: string;
 }
 
+interface Citation {
+  title: string;
+  uri: string;
+  checkedOn: string;
+}
+
 interface Turn {
   role: 'user' | 'assistant';
   text: string;
   /** Tool names as they ran, so the user can see what it actually looked at. */
   tools: string[];
   proposals: Proposal[];
+  citations: Citation[];
 }
 
 const TOOL_LABEL: Record<string, string> = {
@@ -67,8 +74,8 @@ export function Chat({
     setBusy(true);
     setTurns((t) => [
       ...t,
-      { role: 'user', text, tools: [], proposals: [] },
-      { role: 'assistant', text: '', tools: [], proposals: [] },
+      { role: 'user', text, tools: [], proposals: [], citations: [] },
+      { role: 'assistant', text: '', tools: [], proposals: [], citations: [] },
     ]);
 
     try {
@@ -102,6 +109,14 @@ export function Chat({
             if (event.type === 'tool') last.tools = [...last.tools, event.name];
             if (event.type === 'tool_result' && event.output?.proposal) {
               last.proposals = [...last.proposals, event.output as Proposal];
+            }
+            if (event.type === 'citations') {
+              // Same source can ground several claims in one answer.
+              const seen = new Set(last.citations.map((c) => c.uri));
+              last.citations = [
+                ...last.citations,
+                ...(event.citations as Citation[]).filter((c) => !seen.has(c.uri)),
+              ];
             }
             next[next.length - 1] = last;
             return next;
@@ -168,6 +183,7 @@ export function Chat({
               {turn.proposals.map((p, j) => (
                 <ProposalCard key={j} proposal={p} />
               ))}
+              {turn.citations.length > 0 && <Sources citations={turn.citations} />}
             </div>
           ),
         )}
@@ -302,5 +318,37 @@ function ProposalCard({ proposal }: { proposal: Proposal }) {
         <p className="t-caption mt-2 text-critical">{message}</p>
       )}
     </Card>
+  );
+}
+
+/**
+ * Where a figure about the outside world came from.
+ *
+ * The rule that governs this tab is that the model narrates and the code
+ * calculates; anything the code cannot compute — rent in a city, a flight, a
+ * grant rate — has to arrive with a source and the date it was checked, the
+ * same discipline docs/PAY-RULES.md applies to pay law. Showing them is what
+ * lets the user tell a researched number from a guess.
+ */
+function Sources({ citations }: { citations: Citation[] }) {
+  return (
+    <div className="px-1 pt-1">
+      <p className="t-label text-fg-tertiary">Sources</p>
+      <ul className="mt-1 space-y-0.5">
+        {citations.map((c) => (
+          <li key={c.uri}>
+            <a
+              href={c.uri}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="t-caption inline-flex min-h-11 items-center text-fg-secondary underline"
+            >
+              {c.title}
+              <span className="text-fg-tertiary"> · checked {c.checkedOn}</span>
+            </a>
+          </li>
+        ))}
+      </ul>
+    </div>
   );
 }

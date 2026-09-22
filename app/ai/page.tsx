@@ -1,4 +1,5 @@
 import { redirect } from 'next/navigation';
+import type { Part } from '@/lib/ai/types';
 import { createClient } from '@/lib/supabase/server';
 import { getSettings } from '@/lib/db/queries';
 import { hasSupabaseEnv } from '@/lib/supabase/env';
@@ -16,60 +17,55 @@ interface Turn {
     payload: Record<string, unknown>;
     reasoning: string;
   }[];
+  citations: never[];
 }
 
 /**
- * Rebuilds the visible thread from stored content blocks.
+ * Rebuilds the visible thread from stored parts.
  *
- * The transcript holds the full blocks, so a proposal card re-renders from
- * the tool result that produced it — which is why there is no proposal
- * table. Tool-result messages are stored with role 'user' (that is how the
- * Messages API carries them), so they are folded into the assistant turn
- * they belong to rather than shown as something the user said.
+ * The transcript holds the full parts, so a proposal card re-renders from the
+ * tool result that produced it — which is why there is no proposal table.
+ * Results are stored under role 'user' (that is how a model API carries them
+ * back), so they are folded into the assistant turn they belong to rather
+ * than shown as something the user said.
  */
-function rebuild(
-  rows: { role: string; content: unknown }[],
-): { turns: Turn[] } {
+function rebuild(rows: { role: string; content: unknown }[]): { turns: Turn[] } {
   const turns: Turn[] = [];
 
   for (const row of rows) {
-    const blocks = Array.isArray(row.content) ? row.content : [];
-    const isToolResults = blocks.some(
-      (b: Record<string, unknown>) => b?.type === 'tool_result',
-    );
-
-    if (row.role === 'user' && !isToolResults) {
-      const text = blocks
-        .filter((b: Record<string, unknown>) => b?.type === 'text')
-        .map((b: Record<string, unknown>) => String(b.text ?? ''))
+    const parts = (Array.isArray(row.content) ? row.content : []) as Part[];
+    const textOf = () =>
+      parts
+        .filter((p) => p.kind === 'text')
+        .map((p) => (p as { text?: string }).text ?? '')
         .join('');
-      if (text) turns.push({ role: 'user', text, tools: [], proposals: [] });
+
+    const isResults = parts.some((p) => p?.kind === 'result');
+
+    if (row.role === 'user' && !isResults) {
+      const text = textOf();
+      if (text) turns.push({ role: 'user', text, tools: [], proposals: [], citations: [] });
       continue;
     }
 
-    if (row.role === 'user' && isToolResults) {
+    if (row.role === 'user' && isResults) {
       const last = turns[turns.length - 1];
       if (!last || last.role !== 'assistant') continue;
-      for (const block of blocks) {
-        if (block?.type !== 'tool_result') continue;
-        try {
-          const parsed = JSON.parse(String(block.content));
-          if (parsed?.proposal) last.proposals.push(parsed);
-        } catch {
-          // A tool result that is not JSON is not a proposal. Nothing to show.
-        }
+      for (const part of parts) {
+        if (part.kind !== 'result') continue;
+        const output = (part as { output?: unknown }).output as
+          | { proposal?: boolean }
+          | undefined;
+        if (output?.proposal) last.proposals.push(output as Turn['proposals'][number]);
       }
       continue;
     }
 
     // Assistant turn.
-    const text = blocks
-      .filter((b: Record<string, unknown>) => b?.type === 'text')
-      .map((b: Record<string, unknown>) => String(b.text ?? ''))
-      .join('');
-    const tools = blocks
-      .filter((b: Record<string, unknown>) => b?.type === 'tool_use')
-      .map((b: Record<string, unknown>) => String(b.name ?? ''));
+    const text = textOf();
+    const tools = parts
+      .filter((p) => p.kind === 'call')
+      .map((p) => (p as { name?: string }).name ?? '');
 
     const previous = turns[turns.length - 1];
     if (previous?.role === 'assistant' && previous.text === '') {
@@ -77,7 +73,7 @@ function rebuild(
       previous.text += text;
       previous.tools.push(...tools);
     } else {
-      turns.push({ role: 'assistant', text, tools, proposals: [] });
+      turns.push({ role: 'assistant', text, tools, proposals: [], citations: [] });
     }
   }
 
