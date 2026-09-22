@@ -32,6 +32,8 @@ import {
 import { RangeTabs } from '@/app/_components/RangeTabs';
 import { Wordmark } from '@/app/_components/Wordmark';
 import { TabBar } from '@/app/_components/TabBar';
+import { Pending, ViewTransition } from '@/app/_components/ViewTransition';
+import { Step } from '@/app/_components/Step';
 
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -103,7 +105,9 @@ export default async function Dashboard(props: PageProps<'/'>) {
         </Link>
       </header>
 
+      <ViewTransition>
       <RangeTabs active={kind} at={at} />
+      <Pending>
 
       {/* -- The unit: what this range is worth, and the days that made it. --
           One region, one figure, stated once. A hairline rather than a fill:
@@ -238,6 +242,9 @@ export default async function Dashboard(props: PageProps<'/'>) {
         </p>
       )}
 
+      </Pending>
+      </ViewTransition>
+
       <TabBar active="shifts" />
     </Screen>
   );
@@ -286,27 +293,6 @@ function NextStep({
         {empty ? 'Log your first shifts' : 'Enter next week’s roster'}
       </span>
       <Chevron className="t-figure" />
-    </Link>
-  );
-}
-
-/** A step through the range. 44px, because a 32px target is not one. */
-function Step({
-  href,
-  label,
-  children,
-}: {
-  href: string;
-  label: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <Link
-      href={href}
-      aria-label={label}
-      className="t-figure flex size-11 items-center justify-center rounded-lg text-fg-secondary transition-[background-color,transform] duration-150 active:scale-90 active:bg-accent-wash"
-    >
-      {children}
     </Link>
   );
 }
