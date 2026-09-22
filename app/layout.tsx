@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from 'next';
 import { Geist, Petrona } from 'next/font/google';
 import './globals.css';
 import { Boot } from './_components/Boot';
+import { ViewTransition } from './_components/ViewTransition';
 
 // A neutral grotesk. Variable, so the 350/450/550 weights the type ramp asks
 // for are real weights rather than the browser faking them. next/font
@@ -68,7 +69,7 @@ export default function RootLayout({ children }: LayoutProps<'/'>) {
       </head>
       <body className="min-h-full">
         <Boot />
-        {children}
+        <ViewTransition>{children}</ViewTransition>
       </body>
     </html>
   );

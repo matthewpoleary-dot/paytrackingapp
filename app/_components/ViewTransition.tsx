@@ -5,6 +5,7 @@ import {
   createContext,
   useCallback,
   useContext,
+  useEffect,
   useState,
   useTransition,
   type ReactNode,
@@ -54,6 +55,15 @@ export function ViewTransition({ children }: { children: ReactNode }) {
     [router],
   );
 
+  // An attribute rather than a wrapper element, so the CSS can dim the page
+  // content and leave the fixed tab bar and the cold open alone.
+  useEffect(() => {
+    const el = document.documentElement;
+    if (pending) el.setAttribute('data-pending', '');
+    else el.removeAttribute('data-pending');
+    return () => el.removeAttribute('data-pending');
+  }, [pending]);
+
   return <Ctx.Provider value={{ pending, optimistic, go }}>{children}</Ctx.Provider>;
 }
 
@@ -70,12 +80,7 @@ export function ViewTransition({ children }: { children: ReactNode }) {
  */
 export function Pending({ children }: { children: ReactNode }) {
   const { pending } = useView();
-  return (
-    <div
-      aria-busy={pending || undefined}
-      className={`transition-opacity duration-200 ease-out ${pending ? 'opacity-45' : 'opacity-100'}`}
-    >
-      {children}
-    </div>
-  );
+  // The dimming itself is in CSS, keyed off <html data-pending>. This only
+  // announces the wait to a screen reader, which cannot see it.
+  return <div aria-busy={pending || undefined}>{children}</div>;
 }

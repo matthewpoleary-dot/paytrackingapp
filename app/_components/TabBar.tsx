@@ -1,4 +1,4 @@
-import Link from 'next/link';
+import { TLink } from '@/app/_components/TLink';
 
 type Tab = 'shifts' | 'budget' | 'ai';
 
@@ -32,7 +32,7 @@ export function TabBar({ active }: { active: Tab }) {
           {TABS.map((tab) => {
             const current = tab.id === active;
             return (
-              <Link
+              <TLink
                 key={tab.id}
                 href={tab.href}
                 aria-current={current ? 'page' : undefined}
@@ -43,7 +43,7 @@ export function TabBar({ active }: { active: Tab }) {
                 ].join(' ')}
               >
                 <span className={`t-caption ${current ? 'font-medium' : ''}`}>{tab.label}</span>
-              </Link>
+              </TLink>
             );
           })}
         </div>

@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { formatCents } from '@/lib/pay/money';
 import type { DayValue } from '@/lib/pay/aggregate';
 import { StripScroll } from '@/app/_components/StripScroll';
+import { TLink } from '@/app/_components/TLink';
 
 const WEEKDAY_INITIALS = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
 
@@ -384,11 +385,14 @@ export function DateStrip({
   dates,
   days,
   today,
+  selected,
   peakCents,
 }: {
   dates: string[];
   days: Map<string, DayValue>;
   today: string;
+  /** The day being looked at, which is not necessarily today. */
+  selected?: string;
   peakCents: number;
 }) {
   return (
@@ -403,6 +407,7 @@ export function DateStrip({
               date={date}
               value={days.get(date)}
               isToday={date === today}
+              isSelected={date === selected}
               peakCents={peakCents}
             />
           </li>
@@ -418,11 +423,13 @@ function StripDay({
   date,
   value,
   isToday,
+  isSelected,
   peakCents,
 }: {
   date: string;
   value: DayValue | undefined;
   isToday: boolean;
+  isSelected: boolean;
   peakCents: number;
 }) {
   const [y, m, d] = date.split('-').map(Number);
@@ -434,27 +441,46 @@ function StripDay({
     ? `${date}, ${formatCents(value.cents)}${value.estimated ? ' estimated' : ''}, ${value.shiftCount} shift${value.shiftCount === 1 ? '' : 's'}`
     : `${date}, no shifts`;
 
+  // Selected wins, then worked, then neither. Each sits on a different
+  // background, so the ink has to be chosen with the background, not beside it.
+  const ink = isSelected ? 'text-accent-fg' : worked ? INK.onFill : INK.dim;
+
   return (
-    <Link
+    <TLink
       href={`/day/${date}`}
       aria-label={label}
-      aria-current={isToday ? 'date' : undefined}
+      aria-current={isSelected ? 'date' : undefined}
       data-today={isToday ? '' : undefined}
-      className={`flex w-11 flex-col items-center gap-1 rounded-xl py-1.5 ${INK.press}`}
+      className={[
+        'group flex w-11 flex-col items-center gap-1 rounded-xl py-1.5',
+        // Hover is pointer-only: on a phone :hover sticks after a tap and the
+        // day the user just left stays lit. Press covers touch instead.
+        'transition-colors duration-100 [@media(hover:hover)]:hover:bg-accent-wash',
+      ].join(' ')}
     >
-      <span className={`t-label ${isToday ? 'text-fg' : INK.heading}`}>{weekday}</span>
+      <span className={`t-label ${isSelected ? 'text-fg' : INK.heading}`}>{weekday}</span>
       <span
         className={[
           'flex size-9 items-center justify-center rounded-full',
-          'transition-[background-color,transform] duration-150 active:scale-90',
-          worked ? INK.onFill : INK.dim,
+          // Transform only on press, so it stays on the compositor and the
+          // row cannot jitter as the pointer crosses it.
+          'transition-[background-color,transform] duration-150',
+          'group-active:scale-90',
+          // One ink, decided once. Stacking `text-fg-tertiary` and
+          // `text-accent-fg` in the same class string let Tailwind's output
+          // order pick the winner, and it picked the one that rendered the
+          // selected day's date dark on dark.
+          ink,
           worked && value.estimated ? `border border-dashed ${INK.ring}` : '',
-          isToday && !worked ? `ring-1 ring-inset ${INK.today}` : '',
+          isSelected ? 'bg-accent' : '',
+          isToday && !isSelected && !worked ? `ring-1 ring-inset ${INK.today}` : '',
         ].join(' ')}
-        style={worked ? { backgroundColor: fillFor(intensity) } : undefined}
+        style={worked && !isSelected ? { backgroundColor: fillFor(intensity) } : undefined}
       >
-        <span className={`t-caption tabular-nums ${isToday ? 'font-semibold' : ''}`}>{d}</span>
+        <span className={`t-caption tabular-nums ${isToday || isSelected ? 'font-semibold' : ''}`}>
+          {d}
+        </span>
       </span>
-    </Link>
+    </TLink>
   );
 }

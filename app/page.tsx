@@ -32,7 +32,7 @@ import {
 import { RangeTabs } from '@/app/_components/RangeTabs';
 import { Wordmark } from '@/app/_components/Wordmark';
 import { TabBar } from '@/app/_components/TabBar';
-import { Pending, ViewTransition } from '@/app/_components/ViewTransition';
+import { SundayNotice } from '@/app/_components/SundayNotice';
 import { Step } from '@/app/_components/Step';
 
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
@@ -105,9 +105,7 @@ export default async function Dashboard(props: PageProps<'/'>) {
         </Link>
       </header>
 
-      <ViewTransition>
       <RangeTabs active={kind} at={at} />
-      <Pending>
 
       {/* -- The unit: what this range is worth, and the days that made it. --
           One region, one figure, stated once. A hairline rather than a fill:
@@ -162,6 +160,13 @@ export default async function Dashboard(props: PageProps<'/'>) {
           />
         )}
 
+        {/* Instructions for the strip belong to the strip. This line used to
+            sit outside the panel, between the thing it described and the
+            button it did not, which is why it read as stray. */}
+        <p className="t-caption mt-3 text-fg-tertiary">
+          {kind === 'year' ? 'Tap a month to open it.' : 'Tap a day to edit it.'}
+        </p>
+
         {/* Each half appears only where it has something to explain. */}
         {(!empty || value.unconfirmedCount > 0) && (
           <div className="mt-4">
@@ -173,36 +178,15 @@ export default async function Dashboard(props: PageProps<'/'>) {
         )}
       </section>
 
-      <p className="t-caption mt-2.5 px-1 text-fg-secondary">
-        {kind === 'year'
-          ? 'Tap a month to open it.'
-          : empty
-            ? 'Tap any day to log a shift.'
-            : 'Tap any day to add a shift or fix one.'}
-      </p>
-
       {/* -- The one thing to do next. ------------------------------------ */}
       <div className="mt-5">
         <NextStep unconfirmedCount={unconfirmed.length} empty={empty} />
       </div>
 
-      {/* -- The s.14 flag. A plain section: it is a note, not a tile. ----- */}
       {value.sundayWithoutPremium && (
-        <section className="mt-8 px-1">
-          <h2 className="t-heading">You worked a Sunday</h2>
-          <p className="t-caption mt-1.5 text-fg-secondary">
-            No Sunday premium is recorded, so none has been added. Section 14 of the
-            Organisation of Working Time Act 1997 entitles you to compensation for Sunday
-            work unless it was already built into your rate &mdash; which many hospitality
-            contracts do. Worth checking your contract.
-          </p>
-          <Link
-            href="/settings"
-            className="t-caption mt-2 inline-flex min-h-11 items-center underline"
-          >
-            Record a Sunday rate
-          </Link>
-        </section>
+        <div className="mt-8">
+          <SundayNotice />
+        </div>
       )}
 
       {/* -- Everything else this screen can reach. -----------------------
@@ -241,9 +225,6 @@ export default async function Dashboard(props: PageProps<'/'>) {
           {formatCents(saved)} saved of {formatCents(goal.target_cents)}.
         </p>
       )}
-
-      </Pending>
-      </ViewTransition>
 
       <TabBar active="shifts" />
     </Screen>

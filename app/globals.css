@@ -177,6 +177,19 @@ input, select, textarea, button { font: inherit; font-size: 1.0625rem; }
   border-radius: 3px;
 }
 
+/* Held, not blanked. A navigation keeps the current screen mounted and dims
+   it until the next one is ready; `main` only, so the fixed tab bar stays
+   crisp and the tap still feels answered. Opacity alone, so it stays on the
+   compositor, and the reduced-motion rule above flattens the fade without
+   changing the behaviour. */
+[data-pending] main {
+  opacity: 0.45;
+}
+
+main {
+  transition: opacity 180ms ease-out;
+}
+
 .sr-only {
   position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
   overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0;

@@ -29,6 +29,7 @@ import {
   Screen,
   SecondaryLink,
 } from '@/app/_components/ui';
+import { SundayNotice } from '@/app/_components/SundayNotice';
 
 export default async function ThisPeriod(props: PageProps<'/period'>) {
   const settings = await getSettings();
@@ -140,20 +141,10 @@ export default async function ThisPeriod(props: PageProps<'/period'>) {
         </Link>
       )}
 
-      {/* -- The s.14 flag. Only where it could actually apply. ----------- */}
       {value.sundayWithoutPremium && (
-        <Card className="mt-3 px-5 py-4">
-          <p className="t-heading">You worked a Sunday</p>
-          <p className="t-caption mt-1 text-fg-secondary">
-            No Sunday premium is recorded, so none has been added. Section 14 of the
-            Organisation of Working Time Act 1997 entitles you to compensation for
-            Sunday work unless it was already built into your rate &mdash; which many
-            hospitality contracts do. Worth checking your contract.
-          </p>
-          <Link href="/settings" className="t-caption mt-2 inline-flex min-h-11 items-center underline">
-            Record a Sunday rate
-          </Link>
-        </Card>
+        <div className="mt-6">
+          <SundayNotice />
+        </div>
       )}
 
       {/* -- The shifts themselves. --------------------------------------- */}

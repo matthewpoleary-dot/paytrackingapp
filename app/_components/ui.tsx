@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { TLink } from '@/app/_components/TLink';
 import type { ReactNode } from 'react';
 import { formatCents } from '@/lib/pay/money';
 
@@ -23,12 +24,12 @@ export function PageHeader({
   return (
     <header className="mb-6">
       {back && (
-        <Link
+        <TLink
           href={back.href}
           className="t-caption mb-3 -ml-2 inline-flex min-h-11 items-center gap-1 px-2 text-fg-secondary"
         >
           <Chevron direction="left" className="t-body" /> {back.label}
-        </Link>
+        </TLink>
       )}
       {eyebrow && <p className="t-label text-fg-secondary">{eyebrow}</p>}
       <h1 className="t-title mt-1.5 text-balance">{title}</h1>
@@ -88,14 +89,14 @@ export function NavRow({
   className?: string;
 }) {
   return (
-    <Link
+    <TLink
       href={href}
       className={`flex min-h-[3.25rem] items-center gap-3 px-5 py-3 transition-colors duration-150 active:bg-accent-wash ${className}`}
     >
       <span className="t-body flex-1">{label}</span>
       {value && <span className="t-caption text-right text-fg-secondary">{value}</span>}
       <Chevron className="t-figure text-fg-tertiary" />
-    </Link>
+    </TLink>
   );
 }
 

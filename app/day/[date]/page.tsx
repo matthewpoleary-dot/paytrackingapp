@@ -1,6 +1,6 @@
 import { notFound, redirect } from 'next/navigation';
-import { getSettings, getShiftsOn, getUsualShape } from '@/lib/db/queries';
-import { aggregate } from '@/lib/pay/aggregate';
+import { getSettings, getShiftsBetween, getShiftsOn, getUsualShape } from '@/lib/db/queries';
+import { aggregate, byDay } from '@/lib/pay/aggregate';
 import { formatMinutes } from '@/lib/pay/calc';
 import { valueShift } from '@/lib/pay/calc';
 import { dublinClock, dublinDate, isSundayWorkDate } from '@/lib/time/dublin';
@@ -11,6 +11,8 @@ import {
   PageHeader,
   Screen,
 } from '@/app/_components/ui';
+import { DateStrip } from '@/app/_components/MonthCalendar';
+import { weekDates } from '@/lib/db/queries';
 import { AddShiftForm, EditShiftForm, type EditableShift } from './DayEditor';
 
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
@@ -31,6 +33,16 @@ export default async function DayPage(props: PageProps<'/day/[date]'>) {
   const shifts = await getShiftsOn(date);
   const usual = await getUsualShape(settings);
   const value = aggregate(shifts, settings);
+
+  // The week this day sits in, so the strip that got you here is still here
+  // and you can step to the next day without going back first.
+  const [yy, mm, dd] = date.split('-').map(Number);
+  const dow = (new Date(Date.UTC(yy, mm - 1, dd)).getUTCDay() + 6) % 7;
+  const monday = new Date(Date.UTC(yy, mm - 1, dd - dow)).toISOString().slice(0, 10);
+  const week = weekDates(monday);
+  const weekShifts = await getShiftsBetween(week[0], week[6]);
+  const weekDays = byDay(weekShifts, settings);
+  const peakCents = Math.max(0, ...[...weekDays.values()].map((v) => v.cents));
 
   const [y, m, d] = date.split('-').map(Number);
   const title = LONG_DATE.format(new Date(Date.UTC(y, m - 1, d)));
@@ -54,8 +66,21 @@ export default async function DayPage(props: PageProps<'/day/[date]'>) {
           .filter(Boolean)
           .join(' · ') || undefined}
         title={title}
-        back={{ href: `/?month=${date.slice(0, 7)}`, label: 'Calendar' }}
+        back={{ href: `/?range=week&at=${date}`, label: 'Shifts' }}
       />
+
+      {/* The same strip as the dashboard, with this day marked. Arriving on a
+          screen that shows only the day you tapped makes moving to the next
+          one a round trip through the dashboard. */}
+      <div className="mb-5">
+        <DateStrip
+          dates={week}
+          days={weekDays}
+          today={dublinDate()}
+          selected={date}
+          peakCents={peakCents}
+        />
+      </div>
 
       {shifts.length > 0 && (
         <Card className="mb-3 px-5 py-5">
