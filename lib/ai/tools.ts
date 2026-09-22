@@ -14,7 +14,7 @@ import { formatCents, sumCents } from '@/lib/pay/money';
 import { getContributions } from '@/lib/db/queries';
 import {
   cashflow,
-  goalArrival,
+  goalStanding,
   goalTarget,
   outgoingPerWeek,
   shiftsToClose,
@@ -130,23 +130,24 @@ export async function runTool(name: string, input: Record<string, unknown>): Pro
         getContributions(),
       ]);
       const target = goalTarget(lines);
-      const saved = sumCents(contributions.map((c) => c.amount_cents));
 
-      // The rate comes from what has actually been set aside, not from
-      // earnings: what you earn and what you keep are different numbers.
-      const dates = contributions.map((c) => c.contributed_on).sort();
-      const weeksCovered =
-        dates.length < 2
-          ? null
-          : Math.max(
-              1,
-              (Date.parse(`${dates[dates.length - 1]}T00:00:00Z`) -
-                Date.parse(`${dates[0]}T00:00:00Z`)) /
-                (7 * 86_400_000),
-            );
-      const perWeek = weeksCovered === null ? null : Math.round(saved / weeksCovered);
+      // Same rule as the goal screen: itemised lines beat the headline
+      // figure, and the number the user typed is the fallback. Using only
+      // the lines reported a target of €0 to the model while the screen
+      // showed €4,200 — the same figure disagreeing across two surfaces,
+      // which is the exact thing goalStanding exists to stop.
+      const targetCents = target.cents > 0 ? target.cents : goal.target_cents;
 
-      const arrival = goalArrival(target.cents, saved, perWeek, today, goal.target_date);
+      const standing = goalStanding({
+        targetCents,
+        contributions,
+        today,
+        deadline: goal.target_date,
+        typicalShiftCents: 0,
+      });
+      const saved = standing.savedCents;
+      const perWeek = standing.perWeekCents;
+      const arrival = standing.arrival;
       const typicalShift = Math.round(
         (await getShiftsBetween(addDays(today, -56), today))
           .map((s) => valueShift(s, settings).cents)
@@ -156,8 +157,9 @@ export async function runTool(name: string, input: Record<string, unknown>): Pro
       return {
         name: goal.name,
         deadline: goal.target_date,
-        target: money(target.cents),
-        target_confidence: target.weakest,
+        target: money(targetCents),
+        target_from: target.cents > 0 ? 'lines' : 'headline figure',
+        target_confidence: target.cents > 0 ? target.weakest : null,
         breakdown: lines.map((l) => ({
           id: l.id,
           label: l.label,

@@ -18,6 +18,7 @@ export interface Turn {
     reasoning: string;
   }[];
   citations: never[];
+  ungrounded: boolean;
 }
 
 /**
@@ -44,7 +45,7 @@ function rebuild(rows: { role: string; content: unknown }[]): { turns: Turn[] } 
 
     if (row.role === 'user' && !isResults) {
       const text = textOf();
-      if (text) turns.push({ role: 'user', text, tools: [], proposals: [], citations: [] });
+      if (text) turns.push({ role: 'user', text, tools: [], proposals: [], citations: [], ungrounded: false });
       continue;
     }
 
@@ -73,7 +74,7 @@ function rebuild(rows: { role: string; content: unknown }[]): { turns: Turn[] } 
       previous.text += text;
       previous.tools.push(...tools);
     } else {
-      turns.push({ role: 'assistant', text, tools, proposals: [], citations: [] });
+      turns.push({ role: 'assistant', text, tools, proposals: [], citations: [], ungrounded: false });
     }
   }
 

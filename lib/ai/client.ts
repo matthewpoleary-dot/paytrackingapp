@@ -21,21 +21,45 @@ import { ProviderError, RateLimited } from './types';
  */
 
 /**
- * Checked against ai.google.dev/gemini-api/docs/models on 2026-09-22.
+ * Checked against ai.google.dev/gemini-api/docs/models on 2026-09-22, then
+ * measured against the real key the same day.
  *
- * Free tier is Flash and Flash-Lite. `gemini-3.5-flash` is the stable
- * general Flash; the 2.5 generation is documented as restricted to projects
- * that already used it, so a new key cannot rely on it. Flash rather than
- * Flash-Lite because this agent calls tools in a loop and a weaker model
- * that skips a tool call is the exact failure this architecture exists to
- * prevent.
+ * Free tier is Flash and Flash-Lite, and the 2.5 generation is documented as
+ * restricted to projects that already used it. Flash rather than Flash-Lite
+ * because this agent calls tools in a loop, and a weaker model that skips a
+ * tool call is the exact failure the architecture exists to prevent.
+ *
+ * 3.6 rather than 3.5 on evidence, not preference. On 2026-09-22 a plain
+ * request to 3.5-flash returned 200, but every request carrying tool
+ * declarations returned 503 "experiencing high demand" across repeated
+ * attempts, while 3.6-flash completed the full loop — four tool calls and an
+ * answer. 3.8-flash was 503 for everything. Congestion moves, so this is a
+ * default and not a finding; re-measure with scripts/ask.mjs before changing
+ * it.
  *
  * Overridable, so a model change does not need a deploy.
  */
-const MODEL = process.env.GEMINI_MODEL ?? 'gemini-3.5-flash';
+const MODEL = process.env.GEMINI_MODEL ?? 'gemini-3.6-flash';
 
 /** Stops a runaway loop from spending a day's free quota in one request. */
 const MAX_SEARCHES = 5;
+
+/**
+ * Appended when search is unavailable.
+ *
+ * The app's standing rule is that an outside figure without a citation is a
+ * guess and has to say so. With grounding off, every outside figure is in
+ * that position, and the model needs telling — left to itself it will answer
+ * "rent in Bologna" from memory, which is the same failure as inventing a
+ * pay rule.
+ */
+const NO_SEARCH = [
+  'Web search is unavailable for this reply.',
+  'Do not state any figure about the outside world — rents, flights, grants, prices —',
+  'as fact. Say plainly that you could not look it up, and label any number you',
+  'offer as a guess. Figures from the tools are unaffected: those are computed',
+  'and remain exact.',
+].join(' ');
 
 export function hasModelKey(): boolean {
   return Boolean(process.env.GEMINI_API_KEY);
@@ -114,7 +138,12 @@ function toContents(turns: Turn[]): Content[] {
     parts: turn.parts.map((part) => {
       if (part.kind === 'text') return { text: part.text };
       if (part.kind === 'call') {
-        return { functionCall: { name: part.name, args: part.args } };
+        return {
+          functionCall: { name: part.name, args: part.args },
+          // Required back verbatim by Gemini 3, or the next request is
+          // rejected for the whole conversation.
+          ...(part.signature ? { thoughtSignature: part.signature } : {}),
+        };
       }
       return {
         functionResponse: {
@@ -174,6 +203,41 @@ export async function generate({
   tools: ToolSpec[];
   onText: (delta: string) => void;
 }): Promise<ModelReply> {
+  try {
+    return await attempt({ system, turns, tools, onText, grounded: true });
+  } catch (error) {
+    // Grounding carries its own free-tier quota, separate from model
+    // requests, and it runs out first. Measured on one key, same model, same
+    // prompt: plain 200, with googleSearch 429. Every request this app makes
+    // attaches grounding, so an exhausted search quota looked exactly like an
+    // exhausted model quota and took the whole tab down with it.
+    //
+    // So a grounded 429 falls back to one ungrounded pass rather than
+    // failing. That is not papering over it: the reply comes back marked
+    // ungrounded, and the rule the app already has does the rest — a figure
+    // about the outside world with no citation is a guess and has to say so.
+    if (error instanceof RateLimited) {
+      console.warn('[ai] search grounding is rate-limited; retrying without it');
+      const reply = await attempt({ system, turns, tools, onText, grounded: false });
+      return { ...reply, grounded: false };
+    }
+    throw error;
+  }
+}
+
+async function attempt({
+  system,
+  turns,
+  tools,
+  onText,
+  grounded,
+}: {
+  system: string;
+  turns: Turn[];
+  tools: ToolSpec[];
+  onText: (delta: string) => void;
+  grounded: boolean;
+}): Promise<ModelReply> {
   const calls: ModelReply['calls'] = [];
   const citations = new Map<string, Citation>();
   let text = '';
@@ -183,14 +247,12 @@ export async function generate({
       model: MODEL,
       contents: toContents(turns),
       config: {
-        systemInstruction: system,
-        tools: [
-          { functionDeclarations: tools.map(toDeclaration) },
-          // Without search the model answers "what is rent in Bologna" from
-          // memory, which is the same failure as inventing a pay rule. Google
-          // Search grounding is included on the free tier.
-          { googleSearch: {} },
-        ],
+        systemInstruction: grounded ? system : `${system}
+
+${NO_SEARCH}`,
+        tools: grounded
+          ? [{ functionDeclarations: tools.map(toDeclaration) }, { googleSearch: {} }]
+          : [{ functionDeclarations: tools.map(toDeclaration) }],
       },
     });
 
@@ -202,13 +264,18 @@ export async function generate({
         onText(delta);
       }
 
-      for (const call of chunk.functionCalls ?? []) {
+      // Read the raw parts rather than chunk.functionCalls: the convenience
+      // accessor returns the call without the thoughtSignature sitting beside
+      // it, and the signature is not optional on a replayed call.
+      for (const part of chunk.candidates?.[0]?.content?.parts ?? []) {
+        if (!part.functionCall) continue;
         calls.push({
           // Gemini does not issue call ids, and the route needs a stable
           // handle to pair a result with its card.
           id: `call_${Date.now().toString(36)}_${index++}`,
-          name: call.name ?? '',
-          args: (call.args ?? {}) as Record<string, unknown>,
+          name: part.functionCall.name ?? '',
+          args: (part.functionCall.args ?? {}) as Record<string, unknown>,
+          signature: part.thoughtSignature,
         });
       }
 
@@ -227,7 +294,7 @@ export async function generate({
     throw asProviderError(error);
   }
 
-  return { text, calls, citations: [...citations.values()] };
+  return { text, calls, citations: [...citations.values()], grounded: true };
 }
 
 export { MAX_SEARCHES, MODEL };

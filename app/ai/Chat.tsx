@@ -40,6 +40,8 @@ interface Turn {
   tools: string[];
   proposals: Proposal[];
   citations: Citation[];
+  /** Search was unavailable, so anything about the outside world is a guess. */
+  ungrounded: boolean;
 }
 
 const TOOL_LABEL: Record<string, string> = {
@@ -122,8 +124,8 @@ export function Chat({
     setBusy(true);
     setTurns((t) => [
       ...t,
-      { role: 'user', text, tools: [], proposals: [], citations: [] },
-      { role: 'assistant', text: '', tools: [], proposals: [], citations: [] },
+      { role: 'user', text, tools: [], proposals: [], citations: [], ungrounded: false },
+      { role: 'assistant', text: '', tools: [], proposals: [], citations: [], ungrounded: false },
     ]);
 
     try {
@@ -158,6 +160,7 @@ export function Chat({
             if (event.type === 'tool_result' && event.output?.proposal) {
               last.proposals = [...last.proposals, event.output as Proposal];
             }
+            if (event.type === 'ungrounded') last.ungrounded = true;
             if (event.type === 'citations') {
               // Same source can ground several claims in one answer.
               const seen = new Set(last.citations.map((c) => c.uri));
@@ -243,6 +246,12 @@ export function Chat({
                 <ProposalCard key={j} proposal={p} />
               ))}
               {turn.citations.length > 0 && <Sources citations={turn.citations} />}
+              {turn.ungrounded && (
+                <p className="t-caption px-1 text-attention">
+                  Answered without web search &mdash; its quota is spent. Figures from your
+                  own data are exact; anything about the outside world is a guess.
+                </p>
+              )}
             </div>
           ),
         )}
@@ -431,6 +440,7 @@ function Failure({ error }: { error: ChatError }) {
           {error.status === 403 && 'A 403 usually means the Generative Language API is not enabled for the project, or the key is restricted.'}
           {error.status === 404 && 'A 404 usually means the model does not exist under this name.'}
           {error.status === 429 && 'That is a genuine quota limit, not a configuration problem.'}
+          {error.status === 503 && 'The model is busy rather than misconfigured. Asking again usually works.'}
         </p>
       )}
 

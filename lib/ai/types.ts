@@ -25,6 +25,8 @@ export interface ToolCall {
   id: string;
   name: string;
   args: Record<string, unknown>;
+  /** See Part's 'call' variant: replayed calls must carry this back. */
+  signature?: string;
 }
 
 /**
@@ -44,7 +46,25 @@ export interface Citation {
 /** One turn of the transcript, as stored and replayed. */
 export type Part =
   | { kind: 'text'; text: string }
-  | { kind: 'call'; id: string; name: string; args: Record<string, unknown> }
+  | {
+      kind: 'call';
+      id: string;
+      name: string;
+      args: Record<string, unknown>;
+      /**
+       * Gemini 3 returns an opaque signature with each function call and
+       * requires it back when that call is replayed in the history. Dropping
+       * it fails the NEXT request with "Function call is missing a
+       * thought_signature", so the first tool round trip works and the second
+       * one dies — which reads as the tools being broken rather than the
+       * transcript being incomplete.
+       *
+       * Opaque and provider-shaped, but it lives on the neutral Part because
+       * it has to survive being stored and replayed. A provider that has no
+       * such concept simply never sets it.
+       */
+      signature?: string;
+    }
   | { kind: 'result'; id: string; name: string; output: unknown };
 
 export interface Turn {
@@ -57,6 +77,8 @@ export interface ModelReply {
   text: string;
   calls: ToolCall[];
   citations: Citation[];
+  /** False when search was unavailable, so outside figures are guesses. */
+  grounded: boolean;
 }
 
 /**

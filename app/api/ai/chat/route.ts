@@ -104,7 +104,13 @@ export async function POST(request: Request) {
           const modelParts: Part[] = [];
           if (reply.text) modelParts.push({ kind: 'text', text: reply.text });
           for (const call of reply.calls) {
-            modelParts.push({ kind: 'call', id: call.id, name: call.name, args: call.args });
+            modelParts.push({
+              kind: 'call',
+              id: call.id,
+              name: call.name,
+              args: call.args,
+              signature: call.signature,
+            });
           }
 
           // A turn with nothing in it would replay as an empty message and be
@@ -122,6 +128,12 @@ export async function POST(request: Request) {
           // Sources the model actually read, with the date checked, so a
           // figure about the outside world can be stored with its citation.
           if (reply.citations.length > 0) send({ type: 'citations', citations: reply.citations });
+
+          // Search quota is separate from model quota and runs out first. When
+          // it does the answer still comes, ungrounded — and the user has to be
+          // told, or an unsourced outside figure looks exactly like a sourced
+          // one.
+          if (!reply.grounded) send({ type: 'ungrounded' });
 
           if (reply.calls.length === 0) break;
 
