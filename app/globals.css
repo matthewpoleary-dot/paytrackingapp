@@ -379,13 +379,13 @@ input, select, textarea, button { font: inherit; font-size: 1.0625rem; }
 }
 
 .boot-lockup {
-  animation: boot-lockup 620ms cubic-bezier(0.32, 0.72, 0, 1) 620ms both;
+  animation: boot-lockup 420ms cubic-bezier(0.32, 0.72, 0, 1) 320ms both;
   will-change: transform;
 }
 
 .boot-letter {
   display: inline-block;
-  animation: boot-letter 620ms cubic-bezier(0.32, 0.72, 0, 1)
-    calc(620ms + var(--i) * 70ms) both;
+  animation: boot-letter 420ms cubic-bezier(0.32, 0.72, 0, 1)
+    calc(320ms + var(--i) * 45ms) both;
   will-change: transform, opacity;
 }

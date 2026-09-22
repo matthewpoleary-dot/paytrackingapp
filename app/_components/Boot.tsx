@@ -12,16 +12,26 @@ import { useEffect, useLayoutEffect, useRef, useState } from 'react';
  * This is the one place in the app that deliberately costs time, so the
  * sequence is spelled out rather than buried: the mark holds alone, the word
  * opens out of it, the lockup rests, the screen fades.
+ *
+ * It is also the one place measured against the four-second bar rather than
+ * against taste. The first cut of these numbers held the screen for 2.27s
+ * plus a 0.42s fade, which put a cold open at 4.2s to usable unthrottled and
+ * 4.6s at 4x CPU — over the bar before the network had done anything. Every
+ * value below is roughly halved, which keeps the choreography (the mark
+ * still holds alone, the letters still stagger) and returns 1.3s.
+ *
+ * Re-measure before changing them. The sequence is allowed to cost time; it
+ * is not allowed to cost the bar.
  */
-const HOLD_MS = 620;
-const SPREAD_MS = 620;
-const LETTER_STAGGER_MS = 70;
-const REST_MS = 820;
-const FADE_MS = 420;
+const HOLD_MS = 320;
+const SPREAD_MS = 420;
+const LETTER_STAGGER_MS = 45;
+const REST_MS = 260;
+const FADE_MS = 280;
 const MINIMUM_MS = HOLD_MS + SPREAD_MS + LETTER_STAGGER_MS * 3 + REST_MS;
 
 /** Reduced motion gets a shorter wait: there is no animation to sit through. */
-const STILL_MS = 900;
+const STILL_MS = 600;
 
 const REST_OF_WORD = ['a', 'l', 'l', 'y'];
 
