@@ -12,6 +12,21 @@ interface Proposal {
   reasoning: string;
 }
 
+/**
+ * A failure, with whatever the provider actually said.
+ *
+ * Deliberately not reduced to a friendly sentence. "Rate limited" was shown
+ * for every provider error regardless of status, which sent an evening at a
+ * quota that was never the problem — the same shape as /auth/error
+ * headlining "limited to TCD accounts" whatever had gone wrong.
+ */
+interface ChatError {
+  message: string;
+  status?: number;
+  model?: string;
+  detail?: string;
+}
+
 interface Citation {
   title: string;
   uri: string;
@@ -93,7 +108,7 @@ export function Chat({
   const [thread, setThread] = useState<string | null>(conversationId);
   const [input, setInput] = useState('');
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<ChatError | null>(null);
   const endRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -155,11 +170,18 @@ export function Chat({
             return next;
           });
           if (event.type === 'conversation') setThread(event.id);
-          if (event.type === 'error') setError(event.message);
+          if (event.type === 'error') {
+            setError({
+              message: event.message,
+              status: event.status,
+              model: event.model,
+              detail: event.detail,
+            });
+          }
         }
       }
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Something went wrong');
+      setError({ message: e instanceof Error ? e.message : 'Something went wrong' });
     } finally {
       setBusy(false);
     }
@@ -229,11 +251,7 @@ export function Chat({
           <p className="t-caption px-1 text-fg-tertiary">Thinking&hellip;</p>
         )}
 
-        {error && (
-          <p role="alert" className="t-caption rounded-xl border border-border px-4 py-3 text-critical">
-            {error}
-          </p>
-        )}
+        {error && <Failure error={error} />}
         <div ref={endRef} />
       </div>
 
@@ -390,6 +408,42 @@ function Sources({ citations }: { citations: Citation[] }) {
           </li>
         ))}
       </ul>
+    </div>
+  );
+}
+
+/**
+ * The real reason, first.
+ *
+ * The status leads because it is the only part that is reliably true, and
+ * the provider's own words go behind a disclosure for whoever is debugging.
+ * A 400 is nearly always the model ID or the request shape; a 403 is nearly
+ * always the API not being enabled for the project, or a restricted key.
+ */
+function Failure({ error }: { error: ChatError }) {
+  return (
+    <div role="alert" className="rounded-xl border border-critical/40 px-4 py-3">
+      <p className="t-caption text-critical">{error.message}</p>
+
+      {error.status !== undefined && (
+        <p className="t-caption mt-1 text-fg-secondary">
+          {error.status === 400 && 'A 400 usually means the model ID is wrong or unavailable to this key.'}
+          {error.status === 403 && 'A 403 usually means the Generative Language API is not enabled for the project, or the key is restricted.'}
+          {error.status === 404 && 'A 404 usually means the model does not exist under this name.'}
+          {error.status === 429 && 'That is a genuine quota limit, not a configuration problem.'}
+        </p>
+      )}
+
+      {error.detail && (
+        <details className="mt-2">
+          <summary className="t-caption inline-flex min-h-11 cursor-pointer list-none items-center text-fg-secondary underline [&::-webkit-details-marker]:hidden">
+            What the provider said
+          </summary>
+          <p className="t-caption whitespace-pre-wrap break-words pb-1 text-fg-tertiary">
+            {error.detail}
+          </p>
+        </details>
+      )}
     </div>
   );
 }

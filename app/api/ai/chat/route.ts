@@ -1,7 +1,7 @@
 import { createClient } from '@/lib/supabase/server';
 import { buildSystemPrompt, runTool, TOOLS } from '@/lib/ai/tools';
 import { generate, hasModelKey } from '@/lib/ai/client';
-import { RateLimited, type Part, type Turn } from '@/lib/ai/types';
+import { ProviderError, RateLimited, type Part, type Turn } from '@/lib/ai/types';
 
 export const maxDuration = 120;
 
@@ -78,11 +78,22 @@ export async function POST(request: Request) {
       const send = (event: unknown) =>
         controller.enqueue(encoder.encode(`${JSON.stringify(event)}\n`));
 
+      // Counted outside the try so a failure can report how many requests it
+      // took to get there. The count is not obvious and it is the thing most
+      // likely to exhaust a free tier: this loop makes one API request per
+      // ITERATION, not one per user message. A question needing three tools
+      // across two rounds is three requests, and at 5-15 per minute a couple
+      // of those in a row is a self-inflicted 429 that looks exactly like
+      // somebody else's quota problem.
+      let requests = 0;
+
       try {
         send({ type: 'conversation', id: threadId });
 
         // The agentic loop. Runs until the model stops asking for tools.
+
         for (let turn = 0; turn < MAX_TURNS; turn++) {
+          requests += 1;
           const reply = await generate({
             system,
             turns,
@@ -136,7 +147,8 @@ export async function POST(request: Request) {
           .update({ updated_at: new Date().toISOString() })
           .eq('id', threadId);
 
-        send({ type: 'done' });
+        console.info(`[ai] ${requests} provider request${requests === 1 ? '' : 's'} for one message`);
+        send({ type: 'done', requests });
       } catch (error) {
         // A quota error that reaches the user as a stalled spinner is
         // indistinguishable from the app being broken, so it says what it is.
@@ -146,11 +158,26 @@ export async function POST(request: Request) {
             kind: 'rate_limit',
             message: error.message,
             retryAfterSeconds: error.retryAfterSeconds,
+            requests,
+          });
+        } else if (error instanceof ProviderError) {
+          // The status and the provider's own words, not a guess at what they
+          // meant. A 400 here is usually the model ID; a 403 is usually the
+          // API not being enabled for the project.
+          send({
+            type: 'error',
+            kind: 'provider',
+            status: error.status,
+            model: error.model,
+            message: error.message,
+            detail: error.detail,
+            requests,
           });
         } else {
           send({
             type: 'error',
             message: error instanceof Error ? error.message : 'Something went wrong',
+            requests,
           });
         }
       } finally {

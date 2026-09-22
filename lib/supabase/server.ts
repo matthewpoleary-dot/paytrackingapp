@@ -15,9 +15,21 @@ export async function createClient() {
           for (const { name, value, options } of cookiesToSet) {
             cookieStore.set(name, value, options);
           }
-        } catch {
-          // Called from a Server Component, where cookies are read-only.
-          // The middleware refreshes the session, so this is safe to ignore.
+        } catch (error) {
+          // A Server Component cannot write cookies, and the proxy refreshes
+          // the session anyway, so that case is genuinely fine.
+          //
+          // It is not fine silently. This catch also swallows a failed write
+          // from a route handler or a server action, where the cookie was
+          // load-bearing — and a dropped auth cookie with no error, no log
+          // and no trace is a bug that can only be found by guessing. It was
+          // the first suspect for a PKCE failure it turned out not to have
+          // caused, which cost the time anyway.
+          console.warn(
+            '[supabase] could not write cookies:',
+            cookiesToSet.map((c) => c.name).join(', '),
+            error instanceof Error ? error.message : error,
+          );
         }
       },
     },

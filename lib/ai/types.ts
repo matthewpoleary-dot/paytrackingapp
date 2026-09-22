@@ -65,6 +65,34 @@ export interface ModelReply {
  * so the route can say what happened instead of showing a spinner that never
  * resolves.
  */
+/**
+ * Anything the provider rejected that is not a quota problem.
+ *
+ * It carries the real HTTP status and the provider's own words, because the
+ * alternative — a reassuring sentence chosen for a reason nobody checked —
+ * is what made "rate limited" mean "a 400 for a model that does not exist"
+ * and cost an evening. A 400 usually means the model ID or the request
+ * shape; a 403 usually means the API is not enabled for the project or the
+ * key is restricted. Saying which is the whole job.
+ */
+export class ProviderError extends Error {
+  readonly status?: number;
+  readonly model: string;
+  readonly detail: string;
+
+  constructor(status: number | undefined, model: string, detail: string) {
+    super(
+      status
+        ? `The model provider returned ${status} for ${model}.`
+        : `The model provider could not be reached for ${model}.`,
+    );
+    this.name = 'ProviderError';
+    this.status = status;
+    this.model = model;
+    this.detail = detail;
+  }
+}
+
 export class RateLimited extends Error {
   readonly retryAfterSeconds?: number;
   constructor(message: string, retryAfterSeconds?: number) {

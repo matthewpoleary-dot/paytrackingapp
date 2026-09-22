@@ -1,6 +1,12 @@
-import { GoogleGenAI, type Content, type FunctionDeclaration, type Schema } from '@google/genai';
+import {
+  ApiError,
+  GoogleGenAI,
+  type Content,
+  type FunctionDeclaration,
+  type Schema,
+} from '@google/genai';
 import type { Citation, ModelReply, ToolSpec, Turn } from './types';
-import { RateLimited } from './types';
+import { ProviderError, RateLimited } from './types';
 
 /**
  * The provider boundary.
@@ -122,21 +128,37 @@ function toContents(turns: Turn[]): Content[] {
 }
 
 /* -- Failure ---------------------------------------------------------------
-   The free tier allows single-digit requests per minute, so exhausting it is
-   ordinary. It must say so: a quota error that reaches the user as a stalled
-   spinner is indistinguishable from the app being broken. */
+   The status decides, never the wording.
 
-function asRateLimit(error: unknown): RateLimited | null {
-  const status = (error as { status?: number })?.status;
-  const text = error instanceof Error ? error.message : String(error);
-  const looksLikeQuota = /rate limit|quota|RESOURCE_EXHAUSTED|too many requests/i.test(text);
-  if (status !== 429 && !looksLikeQuota) return null;
+   This used to regex the message for "quota" or "rate limit" and report a
+   friendly "you are rate-limited" for anything that matched — which meant a
+   400 for a bad model, or a 403 for an API that was never enabled, both
+   arrived as "wait a minute and try again". That is the same failure as
+   /auth/error headlining "limited to TCD accounts" whatever had gone wrong:
+   a reassuring sentence shown for a reason nobody checked, and it costs
+   hours because it sends you to fix the wrong thing.
 
-  const retry = /retry(?:Delay|-after)"?[:\s]+"?(\d+)/i.exec(text);
-  return new RateLimited(
-    'The free Gemini tier is rate-limited and this request went over it. Wait a minute and ask again.',
-    retry ? Number(retry[1]) : undefined,
-  );
+   So: 429 is the only thing called rate limiting, and every other failure
+   carries its real status and the provider's own words.
+   ------------------------------------------------------------------------ */
+
+function asProviderError(error: unknown): RateLimited | ProviderError {
+  const status = error instanceof ApiError ? error.status : undefined;
+  const detail = error instanceof Error ? error.message : String(error);
+
+  // Logged in full, server-side, because the browser gets a summary and the
+  // provider's own body is the only thing that says what actually happened.
+  console.error('[ai] provider error', { status, model: MODEL, detail });
+
+  if (status === 429) {
+    const retry = /retry(?:Delay|-after)"?[:\s]+"?(\d+)/i.exec(detail);
+    return new RateLimited(
+      'Gemini’s free tier is rate-limited and this went over it. Wait a minute and ask again.',
+      retry ? Number(retry[1]) : undefined,
+    );
+  }
+
+  return new ProviderError(status, MODEL, detail);
 }
 
 /* -- The call -------------------------------------------------------------- */
@@ -202,9 +224,7 @@ export async function generate({
       }
     }
   } catch (error) {
-    const limited = asRateLimit(error);
-    if (limited) throw limited;
-    throw error;
+    throw asProviderError(error);
   }
 
   return { text, calls, citations: [...citations.values()] };
