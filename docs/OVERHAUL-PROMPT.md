@@ -171,6 +171,40 @@ colour work will cover it.
   Nothing that triggers layout.
 - Respect `prefers-reduced-motion`.
 
+## It is not just the segmented control — it is every navigation
+
+Reported 2026-09-22: **tapping "Confirm 3 shifts" takes about three seconds
+to reach the screen**, and returning to the dashboard is the same. Assume
+every route transition in the app has this problem until measured otherwise.
+
+Three seconds is not a slow query, it is a missing transition. Fixes, in
+order of how much they buy:
+
+- **Make "Confirm shifts" a bottom sheet, not a route.** It is a *task*
+  performed on the dashboard, not a destination. A sheet that slides up over
+  the current screen has nothing to load and nothing to lay out, so it is
+  instant by construction. Same reasoning for any other short task flow.
+- **`prefetch` every `Link`** the user can see. The dashboard knows where its
+  own links go.
+- **`useTransition` on every navigation**, so the current screen stays
+  rendered and dims rather than unmounting. The user should never see the
+  app empty.
+- **Route-level `loading.tsx` that matches the destination's exact
+  dimensions**, for genuine first loads only.
+
+## Pointer and press states
+
+The calendar days have no feedback. Add:
+
+- **Hover** — a visible highlight on the day under the pointer, desktop only.
+- **Press** — an immediate pressed state on touch, since there is no hover on
+  a phone and 390px is the primary target.
+- **Selected** — distinct from both, and distinct from *today*, which is
+  currently the only marked state.
+
+All three in `transform`/`opacity`/colour only. No layout change on hover, or
+the row will jitter.
+
 ## Measure it, don't feel it
 
 - **Zero cumulative layout shift** on every transition. Verify in devtools,
@@ -178,6 +212,9 @@ colour work will cover it.
 - The segmented pill responds in the **same frame** as the tap.
 - Throttle the CPU 4× in devtools and check it still holds. It feels fine on
   a laptop and that is not the target.
+- **No route transition exceeds 150ms of perceived delay.** Measure the
+  Confirm flow and the return to dashboard specifically — both are currently
+  around three seconds.
 - `Boot.tsx` currently spends about two seconds on the cold open before the
   app is usable. `CLAUDE.md` says usable in about four seconds from cold.
   Measure the real number on a throttled profile and cut the cold open if it
@@ -255,6 +292,74 @@ debugging the wrong thing. Show the real reason first and make any hint
 match the reason code it was given. Sign-in accepts **any** Google account;
 remove any domain restriction or `hd` parameter.
 
+
+---
+
+# Part D — the Ask lives in the savings goal
+
+The savings goal screen is where the AI belongs. Today it is a separate tab
+the user has to remember to visit, and the goal screen is a static form.
+
+**The goal screen becomes the place the AI permanently lives.** Not a link to
+the Ask tab — the assistant is present on that screen, with the goal as its
+subject.
+
+It must be able to, from that screen:
+
+- **Take an uploaded bank statement** (Revolut CSV) and import it, then say
+  where the money is actually going and which categories are the weak spots.
+- **Build and revise a plan** to reach the goal by its date — using rostered
+  earnings, recurring outgoings and real spending, not a guess.
+- **Answer questions about the goal on demand** — am I on track, what happens
+  if I drop a shift, what if I move the date.
+- **Track it over time**, so returning to the screen shows where things stand
+  without having to ask.
+
+Every euro figure it states still comes from `lib/pay` or `lib/budget`. It
+proposes; the user confirms. Nothing writes silently. Those rules do not relax
+because the surface changed.
+
+## Two bugs on that screen
+
+- **The goal name defaults to the user's own account name** — it currently
+  reads "Matthew O'Leary" as the thing being saved for. The default should be
+  empty with a placeholder, or a sensible generic.
+- **The cards on this screen are still filled.** The hairline-outline change
+  landed on the dashboard only. Apply it everywhere: no card takes a
+  background different from the page field, except the one tinted *not
+  settled yet* card.
+
+---
+
+# Part E — copy
+
+## The Sunday notice reads as written by a machine
+
+Current text:
+
+> **You worked a Sunday.** No Sunday premium is recorded, so none has been
+> added. Section 14 of the Organisation of Working Time Act 1997 entitles you
+> to compensation for Sunday work unless it was already built into your rate
+> — which many hospitality contracts do. Worth checking your contract.
+
+The *substance* is right and must be kept — this flag is the whole reason
+`settings.sunday_premium_kind` stores null distinctly from `'none'`, and it is
+the most defensible thing in the app. The **writing** is the problem: four
+lines of explanation, a statute citation aimed at someone who just wants to
+know if they are owed money, and a limp closing line.
+
+Rewrite it short and direct, and put the legal detail behind a disclosure:
+
+- Two lines maximum on the surface. Tell the user what happened and what it
+  might mean for them. Address them directly.
+- The Act, the section and the "unless it was built into your rate" caveat go
+  behind a **"Why?"** link, for the person who wants it.
+- The action is a real button, not an underlined phrase trailing a paragraph.
+- Never cite a statute number in the first sentence.
+
+Apply the same test to every other block of body copy in the app: **if it
+explains where it could simply tell, it is written by a machine.** Rewrite it.
+
 ---
 
 # Verification, all parts
@@ -266,6 +371,9 @@ remove any domain restriction or `hd` parameter.
 - Every tappable target ≥ 44px.
 - No `shadow` anywhere.
 - Zero layout shift on transitions, verified in devtools.
+- No route transition over 150ms perceived — Confirm and back-to-dashboard
+  measured specifically.
+- Hover, press and selected states present on every interactive element.
 - `npm run lint` and `npm run build` clean.
 - `npm run test:rls` green — and per rule 5, watched to fail first.
 
