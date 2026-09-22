@@ -124,3 +124,12 @@ export function relativeLabel(range: Range, today: string): string {
 export function isFuture(range: Range, today: string): boolean {
   return range.from > today;
 }
+
+/** Every date in a month, for the dashboard's strip. */
+export function monthDates(year: number, month: number): string[] {
+  const total = new Date(Date.UTC(year, month, 0)).getUTCDate();
+  return Array.from(
+    { length: total },
+    (_, i) => `${year}-${String(month).padStart(2, '0')}-${String(i + 1).padStart(2, '0')}`,
+  );
+}

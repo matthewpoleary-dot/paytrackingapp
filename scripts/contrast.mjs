@@ -5,9 +5,9 @@
 // at 2.23:1 while looking fine to the person who chose it — the eye judges the
 // swatch, not the blend.
 //
-// Two worlds were designed, so both are measured. The bone world is the one
-// that was never audited; nothing here is allowed to pass on the forest
-// world's numbers alone.
+// Two worlds were designed, so both are measured. Half of this file exists
+// because one of them once shipped unaudited while the other passed, and the
+// difference is invisible to whoever picked the colours.
 //
 // Exits non-zero if any pair fails its target, so this can gate a build.
 
@@ -18,9 +18,9 @@ import { dirname, join } from 'node:path';
 const CSS = join(dirname(fileURLToPath(import.meta.url)), '..', 'app', 'globals.css');
 
 /* -- Tokens ---------------------------------------------------------------
-   globals.css declares the bone world in the first :root and overrides it
+   globals.css declares the daylight world in the first :root and overrides it
    inside the prefers-color-scheme block. Read it in that order and the second
-   pass produces the forest world, exactly as the browser resolves it. */
+   pass produces the torch-lit world, exactly as the browser resolves it. */
 
 function parseWorlds(css) {
   const bone = {};
@@ -112,19 +112,18 @@ const CHECKS = [
   { fg: 'fg-secondary', bg: 'segment-pill', use: 'text', note: 'segmented control, unselected' },
   { fg: 'fg', bg: 'segment-pill', use: 'text', note: 'range tabs, active' },
 
-  // --- The inverted panel: figure, meta, and the whole calendar. ----------
-  // Its secondary text runs at 70%, which is a floor rather than a taste:
-  // 60% clears 4.5 in the bone world and fails it in the forest world.
+  // --- The inverted card. The dashboard no longer has one, but /budget,
+  //     /goal, /period and /day still do. ---------------------------------
   { fg: 'fg-inverse', bg: 'surface-inverse', use: 'large', note: 'the figure' },
-  { fg: 'fg-inverse', bg: 'surface-inverse', use: 'text', alpha: 0.7, note: 'range label, meta, weekday heads, unworked numerals' },
+  { fg: 'fg-inverse', bg: 'surface-inverse', use: 'text', alpha: 0.7, note: 'caption on an inverted card' },
 
-  // The calendar ramp, both ends, both tones. A worked day is MIN_FILL..1 of
-  // the tone's ink with the date set on top of it, so what has to hold is the
-  // date against the lightest fill and against the heaviest. The floor in
-  // MonthCalendar.tsx exists to keep the first of these above 4.5; if that
-  // constant moves, the `0.66` here moves with it.
-  { fg: 'surface-inverse', bg: 'fg-inverse', on: 'surface-inverse', bgAlpha: 0.66, use: 'text', note: 'date on the lightest worked day' },
-  { fg: 'surface-inverse', bg: 'fg-inverse', on: 'surface-inverse', bgAlpha: 1, use: 'text', note: 'date on the heaviest worked day' },
+  // The calendar ramp, both ends. A worked day is MIN_FILL..1 of --accent
+  // over the field, with the date set in --accent-fg on top of it, so what
+  // has to hold is the date against the lightest fill and against the
+  // heaviest. The floor in MonthCalendar.tsx keeps the first above 4.5; if
+  // that constant moves, the `0.66` here moves with it.
+  { fg: 'accent-fg', bg: 'accent', on: 'surface', bgAlpha: 0.66, use: 'text', note: 'date on the lightest worked day' },
+  { fg: 'accent-fg', bg: 'accent', on: 'surface', bgAlpha: 1, use: 'text', note: 'date on the heaviest worked day' },
 
   { fg: 'accent-fg', bg: 'accent', use: 'text', note: 'primary action label' },
 
@@ -163,14 +162,16 @@ function run(world, tokens) {
 
 /* -- Report --------------------------------------------------------------- */
 
-const { bone, forest } = parseWorlds(readFileSync(CSS, 'utf8'));
-const results = [...run('bone', bone), ...run('forest', forest)];
+const { bone: light, forest: dark } = parseWorlds(readFileSync(CSS, "utf8"));
+const results = [...run("light", light), ...run("dark", dark)];
 
 if (process.argv.includes('--json')) {
   console.log(JSON.stringify(results, null, 2));
 } else {
-  for (const world of ['bone', 'forest']) {
-    console.log(`\n  ${world === 'bone' ? 'Bone world (light)' : 'Forest world (dark)'}\n`);
+  for (const world of ['light', 'dark']) {
+    console.log(`
+  ${world === 'light' ? 'The sheet by daylight' : 'The same sheet under a torch'}
+`);
     for (const r of results.filter((x) => x.world === world)) {
       const mark = r.pass ? '  ok  ' : ' FAIL ';
       const pair =

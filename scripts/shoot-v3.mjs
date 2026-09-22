@@ -105,6 +105,14 @@ if ((await page.getByLabel('One more shift').count()) > 0) {
 await shot('shifts', '/?range=month');
 await shot('shifts-week', '/?range=week');
 await shot('analysis', '/analysis?range=month');
+
+// Candidate palettes, rendered on the real screen rather than as swatches.
+// Review-only; this block goes when a direction is chosen.
+for (const p of (process.env.PALETTES ?? '').split(',').filter(Boolean)) {
+  await shot(`p-${p}`, `/?range=month&palette=${p}`);
+  await shot(`p-${p}-empty`, `/?range=month&at=2020-03-01&palette=${p}`);
+}
+
 await shot('budget', '/budget');
 await shot('ai', '/ai');
 await shot('goal', '/goal');

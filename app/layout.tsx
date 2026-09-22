@@ -1,15 +1,31 @@
 import type { Metadata, Viewport } from 'next';
-import { Geist } from 'next/font/google';
+import { Geist, Petrona } from 'next/font/google';
 import './globals.css';
 import { Boot } from './_components/Boot';
 
-// A neutral grotesk in the spirit of the reference's Uncut Sans. Variable, so
-// the 350/450/550 weights the type ramp asks for are real weights rather than
-// the browser faking them. next/font self-hosts it at build time — no
-// third-party request on the critical path, and no new package.
+// A neutral grotesk. Variable, so the 350/450/550 weights the type ramp asks
+// for are real weights rather than the browser faking them. next/font
+// self-hosts it at build time — no third-party request on the critical path,
+// and no new package.
 const geist = Geist({
   subsets: ['latin'],
   variable: '--font-geist',
+  display: 'swap',
+});
+
+/**
+ * Petrona for headings.
+ *
+ * A narrow-set text serif that holds together at the sizes a map sheet uses
+ * for its labels, which is the register this palette is borrowed from.
+ *
+ * Headings only. Every figure, label and caption stays on Geist, because
+ * money is tabular and a serif with tabular figures is a different and much
+ * longer argument. The hero figure is money, so it is deliberately not here.
+ */
+const petrona = Petrona({
+  subsets: ['latin'],
+  variable: '--font-petrona',
   display: 'swap',
 });
 
@@ -27,8 +43,8 @@ export const viewport: Viewport = {
   // clear rather than a letterboxed strip doing it.
   viewportFit: 'cover',
   themeColor: [
-    { media: '(prefers-color-scheme: light)', color: '#ebe9dc' },
-    { media: '(prefers-color-scheme: dark)', color: '#071f1a' },
+    { media: '(prefers-color-scheme: light)', color: '#e9e7de' },
+    { media: '(prefers-color-scheme: dark)', color: '#17181a' },
   ],
 };
 
@@ -42,7 +58,11 @@ const BOOTED_FLAG = `try{if(sessionStorage.getItem('tally.booted'))document.docu
 // anything inside the tree.
 export default function RootLayout({ children }: LayoutProps<'/'>) {
   return (
-    <html lang="en-IE" className={`${geist.variable} h-full`} suppressHydrationWarning>
+    <html
+      lang="en-IE"
+      className={`${geist.variable} ${petrona.variable} h-full`}
+      suppressHydrationWarning
+    >
       <head>
         <script dangerouslySetInnerHTML={{ __html: BOOTED_FLAG }} />
       </head>

@@ -1,12 +1,13 @@
 import { redirect } from 'next/navigation';
 import { getSettings, getShiftsBetween } from '@/lib/db/queries';
-import { aggregate, byWeek } from '@/lib/pay/aggregate';
+import { aggregate, byDay, byWeek } from '@/lib/pay/aggregate';
 import { formatMinutes } from '@/lib/pay/calc';
 import { sumCents } from '@/lib/pay/money';
 import { isRangeKind, rangeContaining, rangeLabel } from '@/lib/pay/range';
 import { dublinDate } from '@/lib/time/dublin';
 import { Money, PageHeader, Screen } from '@/app/_components/ui';
 import { TabBar } from '@/app/_components/TabBar';
+import { CalendarLegend, MonthCalendar } from '@/app/_components/MonthCalendar';
 import {
   ChartLegend,
   DayOfWeekBars,
@@ -41,6 +42,9 @@ export default async function Analysis(props: PageProps<'/analysis'>) {
 
   const shifts = await getShiftsBetween(range.from, range.to);
   const value = aggregate(shifts, settings);
+  const days = byDay(shifts, settings);
+  const peakCents = Math.max(0, ...[...days.values()].map((d) => d.cents));
+  const [rYear, rMonth] = range.from.split('-').map(Number);
 
   const weeks = [...byWeek(shifts, settings).entries()]
     .filter(([, w]) => w.shiftCount > 0)
@@ -123,6 +127,28 @@ export default async function Analysis(props: PageProps<'/analysis'>) {
               note={`over ${weeks.length}`}
             />
           </dl>
+
+          {/* The month grid lives here rather than on the dashboard. Seeing
+              the shape of a month is this screen's job; the dashboard asks a
+              different question and a grid of empty cells was a poor answer
+              to it. */}
+          {kind === 'month' && (
+            <section className="mt-12">
+              <h2 className="t-heading">The month</h2>
+              <div className="mt-4">
+                <MonthCalendar
+                  year={rYear}
+                  month={rMonth}
+                  days={days}
+                  today={today}
+                  peakCents={peakCents}
+                />
+                <div className="mt-4">
+                  <CalendarLegend showIntensity showEstimated={value.unconfirmedCount > 0} />
+                </div>
+              </div>
+            </section>
+          )}
 
           <section className="mt-12">
             <h2 className="t-heading">Earnings by week</h2>

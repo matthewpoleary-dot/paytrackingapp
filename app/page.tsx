@@ -17,6 +17,7 @@ import {
   isFuture,
   isRangeKind,
   rangeContaining,
+  monthDates,
   rangeLabel,
   relativeLabel,
   stepRange,
@@ -25,8 +26,7 @@ import { dublinDate, formatDateRange } from '@/lib/time/dublin';
 import { Card, Chevron, Group, Money, NavRow, Screen } from '@/app/_components/ui';
 import {
   CalendarLegend,
-  MonthCalendar,
-  WeekStrip,
+  DateStrip,
   YearGrids,
 } from '@/app/_components/MonthCalendar';
 import { RangeTabs } from '@/app/_components/RangeTabs';
@@ -39,14 +39,19 @@ const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
  * The dashboard.
  *
  * One question, asked once: what is this range worth, and which days made it.
- * The figure and the grid are a single unit on a single surface because they
- * are a single thought — splitting them into two cards of equal weight was
- * what left the screen with no reading order and the same money printed four
- * times under three headings.
+ * The figure and the days are a single unit inside a single hairline region
+ * because they are a single thought — splitting them into two filled cards of
+ * equal weight was what left the screen with no reading order and the same
+ * money printed four times under three headings.
  *
- * Everything that analyses rather than answers lives on /analysis. Everything
+ * The days are a strip rather than a grid. A part-timer works three or four
+ * days a week, so a month grid spends most of its area proving that nothing
+ * happened; the month view of the log lives on /analysis, where looking at
+ * shape is the actual job.
+ *
+ * Everything that analyses rather than answers lives there too. Everything
  * that navigates lives in one group at the foot of the page. What is left
- * between them is the range, the number, the grid, and the one thing to do
+ * between them is the range, the number, the days, and the one thing to do
  * next.
  */
 export default async function Dashboard(props: PageProps<'/'>) {
@@ -101,11 +106,13 @@ export default async function Dashboard(props: PageProps<'/'>) {
       <RangeTabs active={kind} at={at} />
 
       {/* -- The unit: what this range is worth, and the days that made it. --
-          One surface, one figure, stated once. The grid is not evidence for
-          the number sitting above it; it is the same number, spread out. */}
-      <Card inverse className="mt-3 px-5 pb-5 pt-4">
+          One region, one figure, stated once. A hairline rather than a fill:
+          on a map sheet nothing is a filled block, and the figure dominates
+          by size and space instead of by sitting on a slab. The days are the
+          same number spread out, not evidence for it. */}
+      <section className="mt-3 rounded-2xl border border-border px-5 pb-5 pt-4">
         <div className="flex items-center justify-between gap-2">
-          <p className="t-label text-fg-inverse/70">{relativeLabel(range, today)}</p>
+          <p className="t-label text-fg-secondary">{relativeLabel(range, today)}</p>
           <div className="-mr-2 flex items-center">
             <Step href={`/?range=${kind}&at=${previous.from}`} label={`Previous ${kind}`}>
               <Chevron direction="left" />
@@ -117,46 +124,34 @@ export default async function Dashboard(props: PageProps<'/'>) {
         </div>
 
         {empty ? (
-          <p className="t-title mt-3 text-fg-inverse/70">
+          <p className="t-title mt-3 text-fg-secondary">
             {ahead ? 'Nothing rostered yet' : 'Nothing logged'}
           </p>
         ) : (
           <>
-            <p className="t-caption mt-3 text-fg-inverse/70">
+            <p className="t-caption mt-3 text-fg-secondary">
               {ahead ? 'will be worth about' : value.estimated ? 'is worth about' : 'is worth'}
             </p>
             <p className="mt-1.5">
               <Money cents={value.cents} estimated={value.estimated} size="hero" />
             </p>
-            <p className="t-caption mt-2 text-fg-inverse/70 tabular-nums">
+            <p className="t-caption mt-2 text-fg-secondary tabular-nums">
               {value.shiftCount} shift{value.shiftCount === 1 ? '' : 's'} &middot;{' '}
               {formatMinutes(value.paidMinutes)}
             </p>
           </>
         )}
 
-        <hr className="my-5 border-0 border-t border-fg-inverse/15" />
+        <hr className="my-5 border-0 border-t border-separator" />
 
-        {kind === 'week' && (
-          <WeekStrip
-            dates={weekDates(range.from)}
-            days={days}
-            today={today}
-            peakCents={peakCents}
-          />
-        )}
-        {kind === 'month' && (
-          <MonthCalendar
-            year={rYear}
-            month={rMonth}
-            days={days}
-            today={today}
-            peakCents={peakCents}
-          />
-        )}
-        {kind === 'year' && (
-          <YearGrids
-            year={rYear}
+        {/* A strip for days, the year grid for months. The strip is the whole
+            reason the old month grid is gone — it holds the same information
+            in a band instead of a field of empty cells. */}
+        {kind === 'year' ? (
+          <YearGrids year={rYear} days={days} today={today} peakCents={peakCents} />
+        ) : (
+          <DateStrip
+            dates={kind === 'week' ? weekDates(range.from) : monthDates(rYear, rMonth)}
             days={days}
             today={today}
             peakCents={peakCents}
@@ -164,13 +159,15 @@ export default async function Dashboard(props: PageProps<'/'>) {
         )}
 
         {/* Each half appears only where it has something to explain. */}
-        <div className={empty ? '' : 'mt-4'}>
-          <CalendarLegend
-            showIntensity={!empty}
-            showEstimated={value.unconfirmedCount > 0}
-          />
-        </div>
-      </Card>
+        {(!empty || value.unconfirmedCount > 0) && (
+          <div className="mt-4">
+            <CalendarLegend
+              showIntensity={!empty}
+              showEstimated={value.unconfirmedCount > 0}
+            />
+          </div>
+        )}
+      </section>
 
       <p className="t-caption mt-2.5 px-1 text-fg-secondary">
         {kind === 'year'
@@ -307,7 +304,7 @@ function Step({
     <Link
       href={href}
       aria-label={label}
-      className="t-figure flex size-11 items-center justify-center rounded-lg text-fg-inverse/70 transition-[background-color,transform] duration-150 active:scale-90 active:bg-fg-inverse/10"
+      className="t-figure flex size-11 items-center justify-center rounded-lg text-fg-secondary transition-[background-color,transform] duration-150 active:scale-90 active:bg-accent-wash"
     >
       {children}
     </Link>

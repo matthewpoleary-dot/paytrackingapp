@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { formatCents } from '@/lib/pay/money';
 import type { DayValue } from '@/lib/pay/aggregate';
+import { StripScroll } from '@/app/_components/StripScroll';
 
 const WEEKDAY_INITIALS = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
 
@@ -45,27 +46,26 @@ function intensityOf(cents: number, peakCents: number): number {
 const LEGEND_STEPS = [0, 1 / 3, 2 / 3, 1].map((t) => MIN_FILL + (1 - MIN_FILL) * t);
 
 /**
- * The grid draws on the inverted panel and nowhere else, so its ink is fixed.
+ * The grid draws on the page field, inside a hairline region — there is no
+ * filled panel anywhere in this world for it to sit on.
  *
- * It was briefly written to take either surface. On the page field the fill is
- * the accent, and the accent in the forest world is brass — dark text on a
- * brass disc bottoms out at 3.89:1, which would have forced the ramp a third
- * shorter to serve a surface nothing renders on. A variant with no caller is
- * not flexibility; it is an untested second design paying rent.
+ * One ink, the accent, which is ink rather than a hue in both worlds. A date
+ * on the lightest worked disc measures 4.86:1, so the whole ramp clears AA
+ * without a threshold flip.
  */
-const CAL_INK = 'var(--fg-inverse)';
+const CAL_INK = 'var(--accent)';
 
 const fillFor = (intensity: number) =>
   `color-mix(in srgb, ${CAL_INK} ${Math.round(intensity * 100)}%, transparent)`;
 
 const INK = {
-  dim: 'text-fg-inverse/70',
-  heading: 'text-fg-inverse/70',
-  onFill: 'text-surface-inverse',
-  ring: 'border-surface-inverse',
-  today: 'ring-fg-inverse/70',
-  press: 'active:bg-fg-inverse/10',
-  empty: 'bg-fg-inverse/15',
+  dim: 'text-fg-tertiary',
+  heading: 'text-fg-secondary',
+  onFill: 'text-accent-fg',
+  ring: 'border-accent-fg',
+  today: 'ring-fg-tertiary',
+  press: 'active:bg-accent-wash',
+  empty: 'bg-segment-track',
 } as const;
 
 /**
@@ -361,5 +361,100 @@ export function CalendarLegend({
         </div>
       )}
     </div>
+  );
+}
+
+/**
+ * The date strip.
+ *
+ * A row of days you scroll rather than a grid you scan. It suits the shape of
+ * the work: a part-timer has three or four shifts in a week, so a month grid
+ * spends most of its area proving that nothing happened — 340px of empty
+ * cells was the single largest thing on the old dashboard.
+ *
+ * The strip keeps every job the grid had. Each day is still a 44px target
+ * that opens that date, still carries its fill intensity, still shows a
+ * dashed ring when the figure behind it is an estimate.
+ *
+ * It scrolls to today on load rather than to the start of the range, because
+ * the question being asked is almost always about now. `scroll-snap` on the
+ * cells keeps a flicked strip from stopping half way across a date.
+ */
+export function DateStrip({
+  dates,
+  days,
+  today,
+  peakCents,
+}: {
+  dates: string[];
+  days: Map<string, DayValue>;
+  today: string;
+  peakCents: number;
+}) {
+  return (
+    <StripScroll
+      className="-mx-5 overflow-x-auto px-5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+      style={{ scrollSnapType: 'x proximity' }}
+    >
+      <ol className="flex gap-1.5">
+        {dates.map((date) => (
+          <li key={date} style={{ scrollSnapAlign: 'center' }}>
+            <StripDay
+              date={date}
+              value={days.get(date)}
+              isToday={date === today}
+              peakCents={peakCents}
+            />
+          </li>
+        ))}
+      </ol>
+    </StripScroll>
+  );
+}
+
+const STRIP_INITIAL = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
+
+function StripDay({
+  date,
+  value,
+  isToday,
+  peakCents,
+}: {
+  date: string;
+  value: DayValue | undefined;
+  isToday: boolean;
+  peakCents: number;
+}) {
+  const [y, m, d] = date.split('-').map(Number);
+  const weekday = STRIP_INITIAL[(new Date(Date.UTC(y, m - 1, d)).getUTCDay() + 6) % 7];
+  const worked = value !== undefined && value.shiftCount > 0;
+  const intensity = worked ? intensityOf(value.cents, peakCents) : 0;
+
+  const label = worked
+    ? `${date}, ${formatCents(value.cents)}${value.estimated ? ' estimated' : ''}, ${value.shiftCount} shift${value.shiftCount === 1 ? '' : 's'}`
+    : `${date}, no shifts`;
+
+  return (
+    <Link
+      href={`/day/${date}`}
+      aria-label={label}
+      aria-current={isToday ? 'date' : undefined}
+      data-today={isToday ? '' : undefined}
+      className={`flex w-11 flex-col items-center gap-1 rounded-xl py-1.5 ${INK.press}`}
+    >
+      <span className={`t-label ${isToday ? 'text-fg' : INK.heading}`}>{weekday}</span>
+      <span
+        className={[
+          'flex size-9 items-center justify-center rounded-full',
+          'transition-[background-color,transform] duration-150 active:scale-90',
+          worked ? INK.onFill : INK.dim,
+          worked && value.estimated ? `border border-dashed ${INK.ring}` : '',
+          isToday && !worked ? `ring-1 ring-inset ${INK.today}` : '',
+        ].join(' ')}
+        style={worked ? { backgroundColor: fillFor(intensity) } : undefined}
+      >
+        <span className={`t-caption tabular-nums ${isToday ? 'font-semibold' : ''}`}>{d}</span>
+      </span>
+    </Link>
   );
 }
