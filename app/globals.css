@@ -22,14 +22,26 @@
   --surface-sunken:  #e0ddcd;
   --surface-inverse: #0b3028;
 
+  /* Opaque, not translucent. A foreground carrying alpha has no fixed
+     contrast — it is whatever the surface underneath makes it, which is how
+     the secondary text on this field measured 2.23:1 while looking settled to
+     the eye that picked it. Every value below is measured against the real
+     surfaces it lands on by scripts/contrast.mjs; change one and re-run it. */
   --fg:              #0b3028;  /* deep green, never black */
-  --fg-secondary:    #5263568c;
-  --fg-tertiary:     #0b302847;
-  --fg-placeholder:  #0b302826;
+  --fg-secondary:    #526356;
+  --fg-tertiary:     #5c6c5f;
+  --fg-placeholder:  #546457;
   --fg-inverse:      #f3f1e6;
 
+  /* Hairlines stay translucent on purpose: they are not text, and a rule
+     heavy enough to clear a text threshold would out-weigh the surface step
+     this design uses instead of shadows. */
   --separator:       #0b30281a;
   --border:          #0b302826;
+
+  /* The fixed tab bar. Content scrolls under it, so it is the page field at
+     most of its strength rather than a fourth surface. */
+  --surface-chrome:  #ebe9dceb;
 
   /* Accent is the deep green itself. Money is never accent-coloured — it is
      already the highest-contrast thing on the screen. */
@@ -37,8 +49,15 @@
   --accent-fg:       #f3f1e6;
   --accent-wash:     #0b30280d;
 
-  /* Brass carries exactly one job: "this is not settled yet". */
-  --attention:       #8a6d2f;
+  /* Brass carries exactly one job: "this is not settled yet".
+
+     Two values, because brass has to do two things this world cannot ask of
+     one colour. True brass at #cbb47c is the identity and survives as the
+     wash. As *text* it measured 4.00:1 on this field while carrying the most
+     important signal in the app, so the ink is the same hue taken down until
+     it clears 4.5 on every surface it lands on. The fill stays brass; the
+     word on top of it is legible. */
+  --attention:       #6f5824;
   --attention-wash:  #cbb47c3d;
 
   --positive:        #2f6b43;
@@ -56,14 +75,19 @@
     --surface-sunken:  #0f3a31;
     --surface-inverse: #f3f1e6;
 
+    /* The forest world was never audited either — it simply started from a
+       higher floor, so only its weakest steps failed. Same rule as the bone
+       world: opaque, and measured. */
     --fg:              #f3f1e6;
-    --fg-secondary:    #b9c9b8a8;
-    --fg-tertiary:     #b9c9b866;
-    --fg-placeholder:  #b9c9b83d;
+    --fg-secondary:    #a7b8a8;
+    --fg-tertiary:     #849789;
+    --fg-placeholder:  #8ba293;
     --fg-inverse:      #0b3028;
 
     --separator:       #d3ddcb1f;
     --border:          #d3ddcb33;
+
+    --surface-chrome:  #071f1aeb;
 
     /* On green, brass is the only thing warm enough to read as a primary
        action. */
@@ -87,6 +111,7 @@
   --color-surface-raised:  var(--surface-raised);
   --color-surface-sunken:  var(--surface-sunken);
   --color-surface-inverse: var(--surface-inverse);
+  --color-surface-chrome:  var(--surface-chrome);
   --color-fg:              var(--fg);
   --color-fg-secondary:    var(--fg-secondary);
   --color-fg-tertiary:     var(--fg-tertiary);
@@ -150,6 +175,19 @@ input, select, textarea, button { font: inherit; font-size: 1.0625rem; }
   position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
   overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0;
 }
+
+/* Fixed chrome that content scrolls under. Without backdrop-filter the
+   translucency has nothing to blur and the bar becomes a smear of whatever
+   passes behind it, so that case goes fully opaque instead. */
+.u-chrome {
+  background: var(--surface-chrome);
+}
+
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .u-chrome { background: var(--surface); }
+}
+
+
 
 
 /* ===========================================================================

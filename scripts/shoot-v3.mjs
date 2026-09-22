@@ -88,6 +88,12 @@ if ((await page.locator('#rate').count()) > 0) {
   await page.waitForURL(new RegExp(String.raw`/$|/period`), { timeout: 20000 });
 }
 
+// The session is minted fresh every run, so this is genuinely the first-run
+// state — the screen a new user actually lands on. A layout that only works
+// full is broken, and so is one that only works empty, so both get captured.
+await shot('shifts-empty', '/?range=month');
+await shot('analysis-empty', '/analysis?range=month');
+
 // A week of shifts, so the figures are not all zero.
 await page.goto(`${BASE}/roster?week=this`, { waitUntil: 'networkidle' });
 if ((await page.getByLabel('One more shift').count()) > 0) {
@@ -97,6 +103,8 @@ if ((await page.getByLabel('One more shift').count()) > 0) {
 }
 
 await shot('shifts', '/?range=month');
+await shot('shifts-week', '/?range=week');
+await shot('analysis', '/analysis?range=month');
 await shot('budget', '/budget');
 await shot('ai', '/ai');
 await shot('goal', '/goal');

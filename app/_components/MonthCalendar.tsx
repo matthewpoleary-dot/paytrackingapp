@@ -12,18 +12,61 @@ const leadingBlanks = (year: number, month: number) =>
   (new Date(Date.UTC(year, month - 1, 1)).getUTCDay() + 6) % 7;
 
 /**
- * Intensity for a worked day, 0–1.
+ * Intensity for a worked day.
  *
- * Floored at 0.22 so the quietest worked day still reads as worked; a linear
- * map from zero would make a short shift indistinguishable from a day off.
+ * A sequential ramp: one hue, light to dark, carrying "how much". The range is
+ * [MIN_FILL, 1] rather than [0, 1] for two reasons, and the second is the one
+ * that set the floor where it is.
+ *
+ * The quietest worked day must still read as worked, so zero is out.
+ *
+ * And the cell has a date sitting on it. Across a full ramp there is a middle
+ * band where the disc is too light for the light ink and too dark for the dark
+ * one — measured at (0.35, 0.52) in the bone world and (0.48, 0.66) in the
+ * forest world — so a fill anywhere in it renders the date illegible whichever
+ * ink is chosen. Flipping at a threshold cannot fix that, because the bands
+ * are where both inks fail. Starting the ramp above the wider of the two lets
+ * one ink serve the whole scale at 4.6:1 or better in both worlds.
+ *
+ * The cost is a shorter scale, paid knowingly: on a grid whose cells carry
+ * dates, "did I work" has to survive before "how much" gets to be precise.
+ *
+ * scripts/contrast.mjs measures both ends of this ramp. Move the floor and
+ * move the `0.66` there with it.
  */
+const MIN_FILL = 0.66;
+
 function intensityOf(cents: number, peakCents: number): number {
-  if (peakCents <= 0) return 0.22;
-  return 0.22 + 0.78 * (cents / peakCents);
+  if (peakCents <= 0) return MIN_FILL;
+  return MIN_FILL + (1 - MIN_FILL) * (cents / peakCents);
 }
 
+/** The legend's steps, so the swatches describe the ramp actually drawn. */
+const LEGEND_STEPS = [0, 1 / 3, 2 / 3, 1].map((t) => MIN_FILL + (1 - MIN_FILL) * t);
+
+/**
+ * The grid draws on the inverted panel and nowhere else, so its ink is fixed.
+ *
+ * It was briefly written to take either surface. On the page field the fill is
+ * the accent, and the accent in the forest world is brass — dark text on a
+ * brass disc bottoms out at 3.89:1, which would have forced the ramp a third
+ * shorter to serve a surface nothing renders on. A variant with no caller is
+ * not flexibility; it is an untested second design paying rent.
+ */
+const CAL_INK = 'var(--fg-inverse)';
+
 const fillFor = (intensity: number) =>
-  `color-mix(in srgb, var(--accent) ${Math.round(intensity * 100)}%, transparent)`;
+  `color-mix(in srgb, ${CAL_INK} ${Math.round(intensity * 100)}%, transparent)`;
+
+const INK = {
+  dim: 'text-fg-inverse/70',
+  heading: 'text-fg-inverse/70',
+  onFill: 'text-surface-inverse',
+  ring: 'border-surface-inverse',
+  today: 'ring-fg-inverse/70',
+  press: 'active:bg-fg-inverse/10',
+  empty: 'bg-fg-inverse/15',
+} as const;
 
 /**
  * One day in the grid.
@@ -65,13 +108,9 @@ function DayCell({
       className={[
         'relative flex aspect-square items-center justify-center rounded-full',
         'transition-[background-color,transform] duration-150 active:scale-90',
-        worked ? '' : 'text-fg-tertiary active:bg-segment-track',
-        worked && value.estimated
-          ? intensity > 0.55
-            ? 'border border-dashed border-accent-fg'
-            : 'border border-dashed border-accent'
-          : '',
-        isToday && !worked ? 'ring-1 ring-inset ring-fg-tertiary' : '',
+        worked ? '' : `${INK.dim} ${INK.press}`,
+        worked && value.estimated ? `border border-dashed ${INK.ring}` : '',
+        isToday && !worked ? `ring-1 ring-inset ${INK.today}` : '',
       ].join(' ')}
       style={worked ? { backgroundColor: fillFor(intensity) } : undefined}
     >
@@ -79,7 +118,7 @@ function DayCell({
         <span
           className={[
             't-caption tabular-nums',
-            worked && intensity > 0.55 ? 'text-accent-fg' : worked ? 'text-fg' : '',
+            worked ? INK.onFill : '',
             isToday ? 'font-semibold underline underline-offset-2' : '',
           ].join(' ')}
         >
@@ -90,7 +129,17 @@ function DayCell({
   );
 }
 
-/** A month of work. Cells land around 45px at 390px, which sets every other size. */
+/**
+ * The grid bleeds 8px past the panel's text padding on each side.
+ *
+ * Seven columns inside that padding land at 42px, and 42px is not a touch
+ * target. The eight pixels buy 44. Text keeps the panel's real margin; only
+ * the grid reaches past it, which also lets the row of discs read as its own
+ * band rather than as another paragraph.
+ */
+const GRID_BLEED = '-mx-2';
+
+/** A month of work. Cells land at 44px at 390px, which sets every other size. */
 export function MonthCalendar({
   year,
   month,
@@ -115,18 +164,8 @@ export function MonthCalendar({
   while (cells.length % 7 !== 0) cells.push(null);
 
   return (
-    <div>
-      <div className="mb-1 grid grid-cols-7 gap-1">
-        {WEEKDAY_INITIALS.map((initial, i) => (
-          <div
-            key={i}
-            aria-hidden="true"
-            className={`t-label text-center ${i === 6 ? 'text-fg-tertiary' : 'text-fg-secondary'}`}
-          >
-            {initial}
-          </div>
-        ))}
-      </div>
+    <div className={GRID_BLEED}>
+      <Weekdays />
 
       <div className="grid grid-cols-7 gap-1">
         {cells.map((date, i) =>
@@ -147,6 +186,21 @@ export function MonthCalendar({
   );
 }
 
+/** The column heads. One weight for all seven — Sunday is not quieter than
+    Monday, and giving it the dimmest token was the calendar's least legible
+    text sitting on its least expected day. */
+function Weekdays() {
+  return (
+    <div className="mb-1.5 grid grid-cols-7 gap-1">
+      {WEEKDAY_INITIALS.map((initial, i) => (
+        <div key={i} aria-hidden="true" className={`t-label text-center ${INK.heading}`}>
+          {initial}
+        </div>
+      ))}
+    </div>
+  );
+}
+
 /**
  * A single week, laid out like the month grid so switching between them does
  * not move the days under the user's thumb.
@@ -163,18 +217,8 @@ export function WeekStrip({
   peakCents: number;
 }) {
   return (
-    <div>
-      <div className="mb-1 grid grid-cols-7 gap-1">
-        {WEEKDAY_INITIALS.map((initial, i) => (
-          <div
-            key={i}
-            aria-hidden="true"
-            className={`t-label text-center ${i === 6 ? 'text-fg-tertiary' : 'text-fg-secondary'}`}
-          >
-            {initial}
-          </div>
-        ))}
-      </div>
+    <div className={GRID_BLEED}>
+      <Weekdays />
       <div className="grid grid-cols-7 gap-1">
         {dates.map((date) => (
           <DayCell
@@ -211,7 +255,9 @@ export function YearGrids({
   peakCents: number;
 }) {
   return (
-    <div className="grid grid-cols-3 gap-x-3 gap-y-4">
+    <div
+      className="grid grid-cols-3 gap-x-3 gap-y-4"
+    >
       {Array.from({ length: 12 }, (_, i) => i + 1).map((month) => {
         const total = daysInMonth(year, month);
         const cells: (string | null)[] = [
@@ -233,10 +279,10 @@ export function YearGrids({
           <Link
             key={month}
             href={`/?range=month&at=${year}-${String(month).padStart(2, '0')}-01`}
-            className="block rounded-lg p-1 transition-colors duration-150 active:bg-segment-track"
+            className={`block rounded-lg p-1 transition-colors duration-150 ${INK.press}`}
             aria-label={`${MONTH_ABBR.format(new Date(Date.UTC(year, month - 1, 1)))} ${year}, ${formatCents(monthCents)}`}
           >
-            <p className="t-label mb-1 text-fg-secondary">
+            <p className={`t-label mb-1 ${INK.heading}`}>
               {MONTH_ABBR.format(new Date(Date.UTC(year, month - 1, 1)))}
             </p>
             <div className="grid grid-cols-7 gap-[2px]">
@@ -251,13 +297,9 @@ export function YearGrids({
                     aria-hidden="true"
                     className={[
                       'aspect-square rounded-full',
-                      worked ? '' : 'bg-segment-track/60',
-                      worked && value.estimated
-                        ? dotIntensity > 0.55
-                          ? 'border border-dashed border-accent-fg'
-                          : 'border border-dashed border-accent'
-                        : '',
-                      date === today ? 'ring-1 ring-fg-tertiary' : '',
+                      worked ? '' : INK.empty,
+                      worked && value.estimated ? `border border-dashed ${INK.ring}` : '',
+                      date === today ? `ring-1 ${INK.today}` : '',
                     ].join(' ')}
                     style={worked ? { backgroundColor: fillFor(dotIntensity) } : undefined}
                   />
@@ -271,31 +313,53 @@ export function YearGrids({
   );
 }
 
-/** Explains the two things the grids encode, without a colour-only legend. */
-export function CalendarLegend() {
+/**
+ * Explains the two things the grids encode, without a colour-only legend.
+ *
+ * Each half renders only where it has something to explain. A scale from Less
+ * to More over a grid with nothing in it annotates an absence, and the
+ * dashboard's first-run state was showing both halves over an empty month.
+ */
+export function CalendarLegend({
+  showIntensity,
+  showEstimated,
+}: {
+  showIntensity: boolean;
+  showEstimated: boolean;
+}) {
+  if (!showIntensity && !showEstimated) return null;
+
   return (
-    <div className="mt-3 flex items-center justify-between gap-3">
-      <div className="flex items-center gap-1.5">
-        <span className="t-label text-fg-secondary">Less</span>
-        {[0.22, 0.45, 0.7, 1].map((a) => (
+    <div
+      className="flex items-center justify-between gap-3"
+    >
+      {showIntensity ? (
+        <div className="flex items-center gap-1.5">
+          <span className={`t-label ${INK.heading}`}>Less</span>
+          {LEGEND_STEPS.map((a) => (
+            <span
+              key={a}
+              aria-hidden="true"
+              className="size-3 rounded-full"
+              style={{ backgroundColor: fillFor(a) }}
+            />
+          ))}
+          <span className={`t-label ${INK.heading}`}>More</span>
+        </div>
+      ) : (
+        <span />
+      )}
+      {showEstimated && (
+        <div className="flex items-center gap-1.5">
           <span
-            key={a}
             aria-hidden="true"
-            className="size-3 rounded-full"
-            style={{ backgroundColor: fillFor(a) }}
+            className={`size-3 rounded-full border border-dashed ${INK.dim} border-current`}
           />
-        ))}
-        <span className="t-label text-fg-secondary">More</span>
-      </div>
-      <div className="flex items-center gap-1.5">
-        <span
-          aria-hidden="true"
-          className="size-3 rounded-full border border-dashed border-accent"
-        />
-        {/* "Estimated", not "Unconfirmed": a future shift cannot be confirmed
-            because it has not happened yet, but it is just as provisional. */}
-        <span className="t-label text-fg-secondary">Estimated</span>
-      </div>
+          {/* "Estimated", not "Unconfirmed": a future shift cannot be confirmed
+              because it has not happened yet, but it is just as provisional. */}
+          <span className={`t-label ${INK.heading}`}>Estimated</span>
+        </div>
+      )}
     </div>
   );
 }

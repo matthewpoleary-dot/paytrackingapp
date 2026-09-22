@@ -76,8 +76,12 @@ export async function saveSetup(
     data: { user },
   } = await supabase.auth.getUser();
 
+  // The proxy gates this route, so arriving here without a user means the
+  // session expired between loading the form and submitting it. Say that,
+  // rather than naming a setting that stopped being relevant when anonymous
+  // sessions were dropped — a wrong error message costs more than none.
   if (!user) {
-    return { error: 'Could not start a session. Check that anonymous sign-ins are enabled.' };
+    return { error: 'Your session expired. Sign in again and your answers will still be here.' };
   }
 
   const anchor =

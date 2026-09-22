@@ -25,7 +25,7 @@ export function RangeTabs({ active, at }: { active: RangeKind; at: string }) {
             href={`/?range=${kind}&at=${at}`}
             aria-current={selected ? 'page' : undefined}
             className={[
-              'flex min-h-9 flex-1 items-center justify-center rounded-[0.625rem]',
+              'flex min-h-11 flex-1 items-center justify-center rounded-[0.625rem]',
               'transition-[background-color,color] duration-150',
               selected
                 ? 'bg-segment-pill font-medium text-fg'

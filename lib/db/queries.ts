@@ -6,7 +6,7 @@ import type { Settings, Shift } from '@/lib/pay/types';
 import type { GoalLine, Outgoing, ProfileFact, Txn } from '@/lib/budget/types';
 
 /**
- * Server-side reads. Every one of these runs as the signed-in anonymous user,
+ * Server-side reads. Every one of these runs as the signed-in Google user,
  * so RLS is what scopes them — there is deliberately no `.eq('user_id', …)`
  * anywhere below. Adding one would hide a policy failure rather than prevent
  * it, and tests/rls.test.mjs exists to prove the policies hold.

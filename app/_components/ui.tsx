@@ -25,14 +25,77 @@ export function PageHeader({
       {back && (
         <Link
           href={back.href}
-          className="t-caption mb-3 -ml-1 inline-flex min-h-9 items-center gap-1 px-1 text-fg-secondary"
+          className="t-caption mb-3 -ml-2 inline-flex min-h-11 items-center gap-1 px-2 text-fg-secondary"
         >
-          <span aria-hidden="true">&larr;</span> {back.label}
+          <Chevron direction="left" className="t-body" /> {back.label}
         </Link>
       )}
       {eyebrow && <p className="t-label text-fg-secondary">{eyebrow}</p>}
       <h1 className="t-title mt-1.5 text-balance">{title}</h1>
     </header>
+  );
+}
+
+/**
+ * The one arrow in the app.
+ *
+ * Drawn rather than typed. `&rarr;` and `&lsaquo;` are different faces at
+ * different weights that happen to live in the same font, which is why the
+ * dashboard ended up with two arrow vocabularies that agreed with neither the
+ * type ramp nor each other. One path, one stroke, sized in `em` so it tracks
+ * whatever it sits beside.
+ */
+export function Chevron({
+  direction = 'right',
+  className = '',
+}: {
+  direction?: 'left' | 'right';
+  className?: string;
+}) {
+  return (
+    <svg
+      aria-hidden="true"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2.25"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className={`size-[1em] shrink-0 ${direction === 'left' ? 'rotate-180' : ''} ${className}`}
+    >
+      <path d="M9 5l7 7-7 7" />
+    </svg>
+  );
+}
+
+/**
+ * A row that navigates.
+ *
+ * Tappable across its full width, not just on the glyph, with the chevron on
+ * the same optical margin everywhere it appears. `value` is a detail, never a
+ * figure the page has already stated — restating money here is what made the
+ * same number appear four times under three labels.
+ */
+export function NavRow({
+  href,
+  label,
+  value,
+  className = '',
+}: {
+  href: string;
+  label: string;
+  value?: ReactNode;
+  className?: string;
+}) {
+  return (
+    <Link
+      href={href}
+      className={`flex min-h-[3.25rem] items-center gap-3 px-5 py-3 transition-colors duration-150 active:bg-accent-wash ${className}`}
+    >
+      <span className="t-body flex-1">{label}</span>
+      {value && <span className="t-caption text-right text-fg-secondary">{value}</span>}
+      <Chevron className="t-figure text-fg-tertiary" />
+    </Link>
   );
 }
 
