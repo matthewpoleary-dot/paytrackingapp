@@ -12,6 +12,7 @@ import { aggregate } from '@/lib/pay/aggregate';
 import { valueShift } from '@/lib/pay/calc';
 import { formatCents, sumCents } from '@/lib/pay/money';
 import { getContributions } from '@/lib/db/queries';
+import { webLookup } from './client';
 import {
   cashflow,
   goalStanding,
@@ -249,6 +250,83 @@ export async function runTool(name: string, input: Record<string, unknown>): Pro
       };
     }
 
+    case 'compare_cost_to_target': {
+      const goal = await getGoal();
+      if (!goal) return { error: 'No goal set yet, so there is nothing to compare a cost against.' };
+
+      const lines = await getGoalLines(goal.id);
+      const fromLines = goalTarget(lines);
+
+      // Same rule as the goal screen: itemised lines beat the headline
+      // figure the user typed.
+      const targetCents = fromLines.cents > 0 ? fromLines.cents : goal.target_cents;
+
+      const supplied = typeof input.estimated_cents === 'number' ? input.estimated_cents : null;
+      const estimatedCents = supplied ?? fromLines.cents;
+
+      if (estimatedCents <= 0) {
+        return {
+          target: money(targetCents),
+          estimated: null,
+          verdict: 'no_estimate',
+          note: 'Nothing to compare yet. Research the costs or propose goal lines, then call this again.',
+        };
+      }
+
+      const gapCents = estimatedCents - targetCents;
+
+      return {
+        goal: goal.name,
+        target: money(targetCents),
+        target_from: fromLines.cents > 0 ? 'the saved lines' : 'the figure the user typed',
+        estimated: money(estimatedCents),
+        estimate_from: supplied === null ? 'the saved lines' : 'your own estimate, not yet saved',
+        gap: money(Math.abs(gapCents)),
+        verdict:
+          gapCents > 0 ? 'target_too_low' : gapCents < 0 ? 'target_covers_it' : 'exact',
+        say_this_first:
+          gapCents > 0
+            ? `Their target of ${formatCents(targetCents)} does not cover this. It looks closer to ${formatCents(estimatedCents)} — ${formatCents(gapCents)} short. Lead with that.`
+            : null,
+      };
+    }
+
+    case 'web_lookup': {
+      const query = String(input.query ?? '').trim();
+      if (!query) return { error: 'A query is required.' };
+
+      try {
+        const found = await webLookup(query);
+        return {
+          query,
+          found: found.text,
+          citations: found.citations,
+          note:
+            found.citations.length > 0
+              ? 'Cite these. A figure from here is "researched" and carries its URL and the date checked.'
+              : 'Nothing was sourced. Anything you say from this is a guess and must use the word.',
+        };
+      } catch (error) {
+        // A failed search is a tool result, not the end of the turn. The
+        // search quota is separate and small, so running out is ordinary —
+        // and the app already knows what an unsourced figure is. Killing the
+        // whole answer would throw away the parts that came from real data.
+        const status = (error as { status?: number })?.status;
+        console.warn('[ai] web_lookup failed', { status, query });
+        return {
+          query,
+          found: null,
+          searched: false,
+          reason:
+            status === 429
+              ? 'The search quota is spent. It refills; this is not a permanent failure.'
+              : 'The lookup failed.',
+          note:
+            'You could not source this. Do NOT state a figure for it as fact. Either say you could not look it up, or give a number and call it a guess, using that word. Figures from the other tools are unaffected and remain exact.',
+        };
+      }
+    }
+
     case 'get_profile_facts': {
       const facts = await getProfileFacts();
       return {
@@ -353,10 +431,29 @@ you invented would destroy that, and it would be indistinguishable from a
 real one.
 
 ON FIGURES ABOUT THE OUTSIDE WORLD: rent in a city, a flight price, an
-Erasmus+ grant rate — search for it. Do not answer from memory. A figure you
-searched for becomes a "researched" goal line carrying its URL and the date
+Erasmus+ grant rate — call web_lookup. Do not answer from memory. A figure
+you looked up becomes a "researched" goal line carrying its URL and the date
 you checked. A figure you could not source is a "guess" and you must say the
 word "guess" when you mention it.
+
+web_lookup has a small quota of its own, so it is only for the outside
+world. Earnings, shifts, spending, the goal, the rate and the projection all
+come from the other tools — never look those up, and never search to be
+polite or to confirm something a tool already told you.
+
+WHEN THEY ASK WHAT SOMETHING COSTS: answer in LINES, not a range. A range
+cannot improve as real numbers arrive; a breakdown can. Break it into the
+parts they will actually pay — flights, rent, deposit, insurance, food,
+visa, travel — look up what you can, and propose a goal line for each with
+its own amount and confidence. Say a guess is a guess. Four honest lines
+beat one confident range.
+
+BEFORE YOU GIVE ANY COST, CALL compare_cost_to_target. If their target does
+not cover what you are about to tell them, that comparison is the first
+sentence of your answer, not a note at the end. Stating that a trip costs
+6,000-8,000 next to a saved target of 3,000, and leaving the user to notice,
+is the single worst thing you can do here — noticing it is what this app is
+for.
 
 ON WRITING: every propose_* tool returns a card the user taps. You have NOT
 saved anything. Never say you have added, saved or recorded something — say

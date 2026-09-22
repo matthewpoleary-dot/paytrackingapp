@@ -98,6 +98,46 @@ export const TOOLS: ToolSpec[] = [
 
   // --- Propose-only. These write nothing. ----------------------------------
   {
+    name: 'compare_cost_to_target',
+    description:
+      'Compare what the goal is expected to COST against the target the user set, and return the gap. Call this whenever you state or research a cost for the goal, before you write the answer — including when your own estimate is the only figure you have. The whole point of this app is noticing that a target of 3,000 does not cover a trip that costs 7,000, and saying so first rather than leaving the two numbers side by side for the user to compare.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        estimated_cents: {
+          type: ['integer', 'null'],
+          minimum: 0,
+          description:
+            'Your own estimate of the total cost, in integer cents, when you have one that is not yet saved as lines. Null to compare the saved lines against the target instead.',
+        },
+      },
+      required: ['estimated_cents'],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: 'web_lookup',
+    description:
+      'Look up a figure about the OUTSIDE world — rent in a city, a flight price, a grant rate, a visa fee. Returns what was found plus the sources, which you must cite. This is the only way to search, and it has a small separate quota, so do not call it for anything answerable from the user’s own data: earnings, shifts, spending, the goal and its progress all come from the other tools. Never call it to be polite or to confirm something you already have.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        query: {
+          type: 'string',
+          maxLength: 300,
+          description: 'A single specific question, e.g. "average monthly rent for a student room in Bologna 2026".',
+        },
+        why: {
+          type: 'string',
+          maxLength: 160,
+          description: 'One line: which part of the answer needs this and why the user’s own data cannot supply it.',
+        },
+      },
+      required: ['query', 'why'],
+      additionalProperties: false,
+    },
+  },
+  {
     name: 'propose_goal_line',
     description:
       'Propose a line for the goal breakdown. Returns a card for the user to tap; it does NOT save. A figure about the outside world must carry the URL you found it at and the date you checked, and be confidence "researched". Without a source it is a "guess" and must say so.',

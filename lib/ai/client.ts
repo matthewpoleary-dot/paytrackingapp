@@ -44,23 +44,6 @@ const MODEL = process.env.GEMINI_MODEL ?? 'gemini-3.6-flash';
 /** Stops a runaway loop from spending a day's free quota in one request. */
 const MAX_SEARCHES = 5;
 
-/**
- * Appended when search is unavailable.
- *
- * The app's standing rule is that an outside figure without a citation is a
- * guess and has to say so. With grounding off, every outside figure is in
- * that position, and the model needs telling — left to itself it will answer
- * "rent in Bologna" from memory, which is the same failure as inventing a
- * pay rule.
- */
-const NO_SEARCH = [
-  'Web search is unavailable for this reply.',
-  'Do not state any figure about the outside world — rents, flights, grants, prices —',
-  'as fact. Say plainly that you could not look it up, and label any number you',
-  'offer as a guess. Figures from the tools are unaffected: those are computed',
-  'and remain exact.',
-].join(' ');
-
 export function hasModelKey(): boolean {
   return Boolean(process.env.GEMINI_API_KEY);
 }
@@ -192,6 +175,19 @@ function asProviderError(error: unknown): RateLimited | ProviderError {
 
 /* -- The call -------------------------------------------------------------- */
 
+/**
+ * One turn of the conversation. Never grounded.
+ *
+ * Attaching googleSearch is what spends the search quota, not searching.
+ * Measured: the prompt "Reply with the word OK." returned 200 plain and 429
+ * with grounding attached — no search could possibly have been needed. So
+ * grounding every message meant "hi" cost a search, and the allowance was
+ * gone before any question that needed one arrived.
+ *
+ * Search is a tool the model has to ask for instead. Questions answerable
+ * from the user's own tables — am I on track, what did I earn — never touch
+ * it, which is most of them.
+ */
 export async function generate({
   system,
   turns,
@@ -203,26 +199,52 @@ export async function generate({
   tools: ToolSpec[];
   onText: (delta: string) => void;
 }): Promise<ModelReply> {
+  return attempt({ system, turns, tools, onText, grounded: false });
+}
+
+/**
+ * One grounded lookup, for a question the user's own data cannot answer.
+ *
+ * Deliberately its own call: no conversation, no tool declarations, one
+ * query. That keeps the search quota tied to the thing that actually needed
+ * searching, and returns the sources attached to the claim they support
+ * rather than to the whole turn.
+ */
+export async function webLookup(
+  query: string,
+): Promise<{ text: string; citations: Citation[]; searched: true }> {
+  const citations = new Map<string, Citation>();
+  let text = '';
+
   try {
-    return await attempt({ system, turns, tools, onText, grounded: true });
-  } catch (error) {
-    // Grounding carries its own free-tier quota, separate from model
-    // requests, and it runs out first. Measured on one key, same model, same
-    // prompt: plain 200, with googleSearch 429. Every request this app makes
-    // attaches grounding, so an exhausted search quota looked exactly like an
-    // exhausted model quota and took the whole tab down with it.
-    //
-    // So a grounded 429 falls back to one ungrounded pass rather than
-    // failing. That is not papering over it: the reply comes back marked
-    // ungrounded, and the rule the app already has does the rest — a figure
-    // about the outside world with no citation is a guess and has to say so.
-    if (error instanceof RateLimited) {
-      console.warn('[ai] search grounding is rate-limited; retrying without it');
-      const reply = await attempt({ system, turns, tools, onText, grounded: false });
-      return { ...reply, grounded: false };
+    const stream = await client().models.generateContentStream({
+      model: MODEL,
+      contents: [{ role: 'user', parts: [{ text: query }] }],
+      config: {
+        systemInstruction:
+          'Answer the question with current figures and say where each came from. ' +
+          'Be brief. If you cannot find a real figure, say so plainly rather than estimating.',
+        tools: [{ googleSearch: {} }],
+      },
+    });
+
+    for await (const chunk of stream) {
+      if (chunk.text) text += chunk.text;
+      for (const ref of chunk.candidates?.[0]?.groundingMetadata?.groundingChunks ?? []) {
+        const uri = ref.web?.uri;
+        if (!uri || citations.has(uri)) continue;
+        citations.set(uri, {
+          title: ref.web?.title ?? uri,
+          uri,
+          checkedOn: new Date().toISOString().slice(0, 10),
+        });
+      }
     }
-    throw error;
+  } catch (error) {
+    throw asProviderError(error);
   }
+
+  return { text, citations: [...citations.values()], searched: true };
 }
 
 async function attempt({
@@ -247,12 +269,8 @@ async function attempt({
       model: MODEL,
       contents: toContents(turns),
       config: {
-        systemInstruction: grounded ? system : `${system}
-
-${NO_SEARCH}`,
-        tools: grounded
-          ? [{ functionDeclarations: tools.map(toDeclaration) }, { googleSearch: {} }]
-          : [{ functionDeclarations: tools.map(toDeclaration) }],
+        systemInstruction: system,
+        tools: [{ functionDeclarations: tools.map(toDeclaration) }],
       },
     });
 
@@ -294,7 +312,7 @@ ${NO_SEARCH}`,
     throw asProviderError(error);
   }
 
-  return { text, calls, citations: [...citations.values()], grounded: true };
+  return { text, calls, citations: [...citations.values()], grounded };
 }
 
 export { MAX_SEARCHES, MODEL };

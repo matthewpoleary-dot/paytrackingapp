@@ -33,7 +33,7 @@ console.log(`HTTP ${r.status}`);
 if (!r.body) { console.log(await r.text()); process.exit(0); }
 
 const reader=r.body.getReader(); const dec=new TextDecoder();
-let buf=''; let text=''; const tools=[]; let requests=null; let err=null;
+let buf=''; let text=''; const tools=[]; let requests=null; let searches=null; let err=null;
 while(true){
   const {done,value}=await reader.read(); if(done) break;
   buf+=dec.decode(value,{stream:true});
@@ -44,7 +44,7 @@ while(true){
     if(e.type==='text') text+=e.text;
     if(e.type==='tool') tools.push(e.name);
     if(e.type==='tool_result') tools[tools.length-1]+=` -> ${JSON.stringify(e.output).slice(0,110)}`;
-    if(e.type==='done') requests=e.requests;
+    if(e.type==='done'){ requests=e.requests; searches=e.searches; }
     if(e.type==='error') err=e;
   }
 }
@@ -53,4 +53,7 @@ console.log(tools.length ? tools.map(t=>'  '+t).join('\n') : '  NONE  <-- the fa
 console.log('\n--- ANSWER ---');
 console.log(text.trim().slice(0,900) || '(empty)');
 if(err) console.log('\n--- ERROR ---\n', JSON.stringify(err,null,2).slice(0,900));
-console.log(`\n--- provider requests for this one message: ${requests ?? 'n/a'} ---`);
+console.log(
+  `\n--- for one message: ${requests ?? 'n/a'} provider requests, ` +
+    `${searches ?? 'n/a'} grounded searches ---`,
+);

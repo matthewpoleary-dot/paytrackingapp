@@ -87,6 +87,11 @@ export async function POST(request: Request) {
       // somebody else's quota problem.
       let requests = 0;
 
+      // Counted separately, because search has its own small quota and used
+      // to be attached to EVERY message — "hi" spent one. It is a tool now,
+      // so this should be 0 for anything answerable from the user's own data.
+      let searches = 0;
+
       try {
         send({ type: 'conversation', id: threadId });
 
@@ -133,7 +138,7 @@ export async function POST(request: Request) {
           // it does the answer still comes, ungrounded — and the user has to be
           // told, or an unsourced outside figure looks exactly like a sourced
           // one.
-          if (!reply.grounded) send({ type: 'ungrounded' });
+
 
           if (reply.calls.length === 0) break;
 
@@ -142,6 +147,18 @@ export async function POST(request: Request) {
             send({ type: 'tool', name: call.name });
             const output = await runTool(call.name, call.args);
             send({ type: 'tool_result', name: call.name, id: call.id, output });
+
+            // Sources arrive attached to the lookup that needed them rather
+            // than to the whole turn, so they travel with the claim.
+            const found = output as { citations?: unknown[]; searched?: boolean } | null;
+            if (call.name === 'web_lookup') {
+              if (found?.searched !== false) searches += 1;
+              if (Array.isArray(found?.citations) && found.citations.length > 0) {
+                send({ type: 'citations', citations: found.citations });
+              } else {
+                send({ type: 'ungrounded' });
+              }
+            }
             results.push({ kind: 'result', id: call.id, name: call.name, output });
           }
 
@@ -159,8 +176,11 @@ export async function POST(request: Request) {
           .update({ updated_at: new Date().toISOString() })
           .eq('id', threadId);
 
-        console.info(`[ai] ${requests} provider request${requests === 1 ? '' : 's'} for one message`);
-        send({ type: 'done', requests });
+        console.info(
+          `[ai] ${requests} provider request${requests === 1 ? '' : 's'} ` +
+            `and ${searches} grounded search${searches === 1 ? '' : 'es'} for one message`,
+        );
+        send({ type: 'done', requests, searches });
       } catch (error) {
         // A quota error that reaches the user as a stalled spinner is
         // indistinguishable from the app being broken, so it says what it is.
@@ -171,6 +191,7 @@ export async function POST(request: Request) {
             message: error.message,
             retryAfterSeconds: error.retryAfterSeconds,
             requests,
+            searches,
           });
         } else if (error instanceof ProviderError) {
           // The status and the provider's own words, not a guess at what they
@@ -184,6 +205,7 @@ export async function POST(request: Request) {
             message: error.message,
             detail: error.detail,
             requests,
+            searches,
           });
         } else {
           send({
