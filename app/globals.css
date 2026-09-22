@@ -353,12 +353,6 @@ input, select, textarea, button { font: inherit; font-size: 1.0625rem; }
   animation: skeleton-pulse 1.6s ease-in-out infinite;
 }
 
-.skeleton-on-inverse {
-  background: color-mix(in srgb, var(--fg-inverse) 14%, transparent);
-  border-radius: 0.5rem;
-  animation: skeleton-pulse 1.6s ease-in-out infinite;
-}
-
 @keyframes skeleton-pulse {
   0%, 100% { opacity: 1; }
   50%      { opacity: 0.55; }

@@ -99,25 +99,41 @@ export function NavRow({
   );
 }
 
+/**
+ * The headline region: whatever number a screen exists to state.
+ *
+ * A hairline, not a fill. Every one of these was an inverted dark card until
+ * the Discovery Series palette landed, and five dark slabs across five
+ * screens were the heaviest thing in the app — the figure was being carried
+ * by its background rather than by its size.
+ *
+ * On a map sheet nothing is a filled block. Rank comes from ink weight and
+ * from space, so the figure keeps the hero ramp and everything around it goes
+ * quiet instead.
+ */
+export function Panel({
+  children,
+  className = '',
+}: {
+  children: ReactNode;
+  className?: string;
+}) {
+  return (
+    <section className={`rounded-2xl border border-border px-5 py-5 ${className}`}>
+      {children}
+    </section>
+  );
+}
+
 /** A raised surface. Flat — separation comes from the surface step, not shadow. */
 export function Card({
   children,
   className = '',
-  inverse = false,
 }: {
   children: ReactNode;
   className?: string;
-  inverse?: boolean;
 }) {
-  return (
-    <section
-      className={`rounded-2xl ${
-        inverse ? 'bg-surface-inverse text-fg-inverse' : 'bg-surface-raised'
-      } ${className}`}
-    >
-      {children}
-    </section>
-  );
+  return <section className={`rounded-2xl bg-surface-raised ${className}`}>{children}</section>;
 }
 
 /** A hairline-separated list inside a Card. */
@@ -163,7 +179,7 @@ export function Money({
   );
 }
 
-/** The brass "not settled yet" line. Never the only signal, always paired. */
+/** The "not settled yet" line, in the one tinted token. Never the only signal. */
 export function EstimateNote({ children }: { children: ReactNode }) {
   return <p className="t-caption text-attention">{children}</p>;
 }

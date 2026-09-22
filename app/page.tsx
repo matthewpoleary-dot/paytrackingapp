@@ -194,7 +194,7 @@ export default async function Dashboard(props: PageProps<'/'>) {
           </p>
           <Link
             href="/settings"
-            className="t-caption mt-2 inline-flex min-h-11 items-center text-attention underline"
+            className="t-caption mt-2 inline-flex min-h-11 items-center underline"
           >
             Record a Sunday rate
           </Link>

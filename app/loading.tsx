@@ -1,4 +1,4 @@
-import { Card, Screen } from '@/app/_components/ui';
+import { Card, Screen, Panel } from '@/app/_components/ui';
 import { Wordmark } from '@/app/_components/Wordmark';
 
 /**
@@ -22,11 +22,11 @@ export default function DashboardLoading() {
 
         {/* The hero card's surface is known immediately; only the figure
             inside it has to wait. */}
-        <Card inverse className="px-6 py-6">
-          <div className="skeleton-on-inverse h-3 w-40" />
-          <div className="skeleton-on-inverse mt-3 h-12 w-56" />
-          <div className="skeleton-on-inverse mt-3 h-3 w-48" />
-        </Card>
+        <Panel className="px-6 py-6">
+          <div className="skeleton h-3 w-40" />
+          <div className="skeleton mt-3 h-12 w-56" />
+          <div className="skeleton mt-3 h-3 w-48" />
+        </Panel>
 
         <div className="mt-6">
           <div className="skeleton mb-2 ml-1 h-3 w-28" />

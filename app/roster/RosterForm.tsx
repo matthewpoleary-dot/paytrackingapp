@@ -2,7 +2,7 @@
 
 import { useActionState, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
-import { Card, ErrorNote, PageHeader, PrimaryButton, Screen } from '@/app/_components/ui';
+import { Card, ErrorNote, PageHeader, PrimaryButton, Screen, Chevron } from '@/app/_components/ui';
 import { saveRoster, type RosterState } from './actions';
 
 interface Draft {
@@ -110,14 +110,14 @@ export function RosterForm({
           mean re-entering the same shape each time. */}
       <div className="mb-3 flex items-center justify-between gap-2 rounded-xl bg-segment-track px-2 py-2">
         <WeekStep href={`/roster?start=${previousWeek}`} label="Previous week">
-          &lsaquo;
+          <Chevron direction="left" />
         </WeekStep>
         <div className="min-w-0 text-center">
           <p className="t-label text-fg-secondary">{relative}</p>
           <p className="t-heading tabular-nums">{weekRange}</p>
         </div>
         <WeekStep href={`/roster?start=${nextWeek}`} label="Next week">
-          &rsaquo;
+          <Chevron />
         </WeekStep>
       </div>
 

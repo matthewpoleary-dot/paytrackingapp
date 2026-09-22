@@ -22,7 +22,7 @@ import {
 import { CATEGORY_LABEL } from '@/lib/budget/types';
 import { valueShift } from '@/lib/pay/calc';
 import { addDays, dublinDate } from '@/lib/time/dublin';
-import { Card, Group, GroupRow, Money, Screen } from '@/app/_components/ui';
+import { Card, Group, GroupRow, Money, Screen, Panel } from '@/app/_components/ui';
 import { TabBar } from '@/app/_components/TabBar';
 import { CsvImport, GoalLineForm, OutgoingForm } from './BudgetForms';
 import { endOutgoing } from './actions';
@@ -84,23 +84,23 @@ export default async function BudgetPage() {
     <Screen>
       <header className="mb-4 flex items-baseline justify-between gap-2">
         <h1 className="t-title">Budget</h1>
-        <Link href="/goal" className="t-caption min-h-9 px-1 pt-2 text-fg-secondary">
+        <Link href="/goal" className="t-caption -mr-2 inline-flex min-h-11 items-center px-2 text-fg-secondary">
           Contributions
         </Link>
       </header>
 
       {/* -- The sentence the app exists to say. -------------------------- */}
-      <Card inverse className="px-6 py-6">
+      <Panel className="px-6 py-6">
         {goal && target.cents > 0 ? (
           <>
-            <p className="t-caption opacity-70">
+            <p className="t-caption text-fg-secondary">
               {goal.name}
               {goal.target_date && ` by ${goal.target_date.slice(0, 7)}`}
             </p>
             <p className="mt-2">
               <Money cents={target.cents} estimated={target.weakest !== 'quoted'} size="hero" />
             </p>
-            <p className="t-caption mt-2.5 opacity-70">
+            <p className="t-caption mt-2.5 text-fg-secondary">
               You&rsquo;re at {formatCents(saved)}
               {arrival.arrivesOn && ` · on track for ${arrival.arrivesOn}`}
             </p>
@@ -110,17 +110,17 @@ export default async function BudgetPage() {
                 {extraShifts ? ` — ${extraShifts} more shift${extraShifts === 1 ? '' : 's'} closes it` : ''}
               </p>
             )}
-            {arrival.reason && <p className="t-caption mt-2 opacity-70">{arrival.reason}</p>}
+            {arrival.reason && <p className="t-caption mt-2 text-fg-secondary">{arrival.reason}</p>}
           </>
         ) : (
           <>
-            <p className="t-caption opacity-70">No target yet</p>
+            <p className="t-caption text-fg-secondary">No target yet</p>
             <p className="t-body mt-2 opacity-90">
               Add what the trip will cost, line by line. The target is the sum.
             </p>
           </>
         )}
-      </Card>
+      </Panel>
 
       {/* -- What the goal is made of. ------------------------------------ */}
       <section className="mt-6">
@@ -166,7 +166,7 @@ export default async function BudgetPage() {
             <p className="t-caption text-fg-secondary">
               Set a goal first, then add what it costs.
             </p>
-            <Link href="/goal" className="t-caption mt-2 inline-block text-attention underline">
+            <Link href="/goal" className="t-caption mt-2 inline-flex min-h-11 items-center underline">
               Set a goal
             </Link>
           </Card>

@@ -1,7 +1,7 @@
 import { redirect } from 'next/navigation';
 import { getSettings, getUnconfirmedShifts } from '@/lib/db/queries';
 import { dublinClock, formatDublinTime, formatWorkDate } from '@/lib/time/dublin';
-import { Card, Empty, PageHeader, PrimaryLink, Screen } from '@/app/_components/ui';
+import { Empty, PageHeader, PrimaryLink, Screen } from '@/app/_components/ui';
 import { ConfirmForm } from './ConfirmForm';
 
 export default async function ConfirmPage() {

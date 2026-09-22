@@ -19,11 +19,13 @@ import {
 } from '@/lib/time/dublin';
 import {
   Card,
+  Chevron,
   Empty,
   EstimateNote,
   Group,
   GroupRow,
   Money,
+  Panel,
   PrimaryLink,
   Screen,
   SecondaryLink,
@@ -82,42 +84,42 @@ export default async function ThisPeriod(props: PageProps<'/period'>) {
           <p className="t-label text-fg-secondary">{label}</p>
           <div className="mt-1 flex items-center gap-1">
             <PeriodStep href={`/period?period=${previous.startsOn}`} label="Previous period">
-              &lsaquo;
+              <Chevron direction="left" />
             </PeriodStep>
             <h1 className="t-heading whitespace-nowrap tabular-nums">
               {formatDateRange(period.startsOn, period.endsOn)}
             </h1>
             <PeriodStep href={`/period?period=${next.startsOn}`} label="Next period">
-              &rsaquo;
+              <Chevron />
             </PeriodStep>
           </div>
         </div>
         <Link
           href="/settings"
-          className="t-caption min-h-9 shrink-0 px-1 pt-1.5 text-fg-secondary tabular-nums"
+          className="t-caption -mr-2 inline-flex min-h-11 shrink-0 items-center px-2 text-fg-secondary tabular-nums"
         >
           {formatCents(settings.hourly_rate_cents)}/hr
         </Link>
       </header>
 
       {!isCurrent && (
-        <Link href="/period" className="t-caption mb-3 inline-block text-attention underline">
+        <Link href="/period" className="t-caption mb-3 inline-flex min-h-11 items-center underline">
           Back to this period
         </Link>
       )}
 
       {/* -- The number. The whole point of the screen. ------------------- */}
-      <Card inverse className="px-6 py-7">
-        <p className="t-caption opacity-70">{worthLabel}</p>
+      <Panel className="px-6 py-7">
+        <p className="t-caption text-fg-secondary">{worthLabel}</p>
         <p className="mt-2">
           <Money cents={value.cents} estimated={value.estimated} size="hero" />
         </p>
-        <p className="t-caption mt-3 opacity-70">
+        <p className="t-caption mt-3 text-fg-secondary">
           {value.shiftCount === 0
             ? 'No shifts logged yet'
             : `${value.shiftCount} shift${value.shiftCount === 1 ? '' : 's'} · ${formatMinutes(value.paidMinutes)} paid`}
         </p>
-      </Card>
+      </Panel>
 
       {/* -- Why it is still a guess, and what to do about it. ------------ */}
       {unconfirmed.length > 0 && (
@@ -131,9 +133,7 @@ export default async function ThisPeriod(props: PageProps<'/period'>) {
                 Until then this is an estimate, not a figure you could stand over.
               </p>
             </div>
-            <span aria-hidden="true" className="t-figure text-attention">
-              &rarr;
-            </span>
+            <Chevron className="t-figure text-attention" />
           </Card>
         </Link>
       )}
@@ -148,7 +148,7 @@ export default async function ThisPeriod(props: PageProps<'/period'>) {
             Sunday work unless it was already built into your rate &mdash; which many
             hospitality contracts do. Worth checking your contract.
           </p>
-          <Link href="/settings" className="t-caption mt-2 inline-block text-attention underline">
+          <Link href="/settings" className="t-caption mt-2 inline-flex min-h-11 items-center underline">
             Record a Sunday rate
           </Link>
         </Card>
@@ -231,7 +231,7 @@ function PeriodStep({
     <Link
       href={href}
       aria-label={label}
-      className="t-figure -my-1 flex size-8 shrink-0 items-center justify-center rounded-md text-fg-secondary transition-colors duration-150 active:bg-segment-track"
+      className="t-figure -my-1 flex size-11 shrink-0 items-center justify-center rounded-lg text-fg-secondary transition-colors duration-150 active:bg-segment-track"
     >
       {children}
     </Link>

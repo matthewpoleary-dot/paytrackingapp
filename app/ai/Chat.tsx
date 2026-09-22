@@ -136,7 +136,7 @@ export function Chat({
                   key={o}
                   type="button"
                   onClick={() => void send(o)}
-                  className="t-caption min-h-9 rounded-lg bg-segment-track px-3 text-fg-secondary transition-transform duration-150 active:scale-95"
+                  className="t-caption inline-flex min-h-11 items-center rounded-lg bg-segment-track px-3 text-fg-secondary transition-transform duration-150 active:scale-95"
                 >
                   {o}
                 </button>

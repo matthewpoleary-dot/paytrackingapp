@@ -3,7 +3,7 @@ import { getContributions, getGoal, getSettings } from '@/lib/db/queries';
 import { project } from '@/lib/pay/projection';
 import { formatCents } from '@/lib/pay/money';
 import { dublinDate } from '@/lib/time/dublin';
-import { Card, Empty, Group, GroupRow, Money, PageHeader, Screen } from '@/app/_components/ui';
+import { Card, Empty, Group, GroupRow, Money, PageHeader, Screen, Panel } from '@/app/_components/ui';
 import { ContributionForm, GoalForm } from './GoalForms';
 import { deleteContribution } from './actions';
 
@@ -35,14 +35,14 @@ export default async function GoalPage() {
       />
 
       {goal && p && (
-        <Card inverse className="mb-3 px-6 py-6">
-          <p className="t-caption opacity-70">
+        <Panel className="mb-3 px-6 py-6">
+          <p className="t-caption text-fg-secondary">
             {p.reached ? 'Target reached' : 'Set aside so far'}
           </p>
           <p className="mt-2">
             <Money cents={p.savedCents} estimated={false} size="hero" />
           </p>
-          <p className="t-caption mt-2 opacity-70">
+          <p className="t-caption mt-2 text-fg-secondary">
             of {formatCents(p.targetCents)}
             {goal.target_date && ` by ${formatDay(goal.target_date)}`}
           </p>
@@ -60,12 +60,12 @@ export default async function GoalPage() {
             />
           </div>
 
-          <p className="t-caption mt-3 opacity-70">
+          <p className="t-caption mt-3 text-fg-secondary">
             {p.reached
               ? 'Nothing left to save. Set a new target whenever you like.'
               : `${formatCents(p.remainingCents)} to go`}
           </p>
-        </Card>
+        </Panel>
       )}
 
       {goal && p && !p.reached && (
