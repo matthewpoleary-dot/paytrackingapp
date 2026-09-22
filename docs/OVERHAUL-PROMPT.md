@@ -2,7 +2,10 @@
 
 Paste into Claude Code, or: *read `docs/OVERHAUL-PROMPT.md` and do it.*
 
-Read `CLAUDE.md` and `docs/DESIGN-AUDIT.md` first.
+Read `CLAUDE.md` first — in particular the **v3 scope** section, which wins
+over anything above it. Then `docs/DESIGN-AUDIT.md`, which is marked
+superseded: its banner says which findings are still open and which are
+already fixed. Work the open ones; do not re-derive the fixed ones.
 
 ---
 
