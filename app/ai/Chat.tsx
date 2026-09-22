@@ -42,19 +42,52 @@ const TOOL_LABEL: Record<string, string> = {
   propose_txn_category: 'Suggesting a category',
 };
 
+/**
+ * Openers, which are not decoration.
+ *
+ * An empty chat box is the same problem as an empty search box: the user has
+ * to guess what it can do. These name the four things it is actually good at,
+ * and they are deliberately about this user's own data rather than about the
+ * world, because that is the only reason to ask here rather than on
+ * claude.ai.
+ *
+ * Nothing here hardcodes a city or a date. The goal is whatever the user is
+ * saving for, so the questions are shaped around the goal, not around a trip
+ * somebody once mentioned.
+ */
 const OPENERS = [
-  'How am I doing for Erasmus?',
-  'What will I have saved by August?',
-  'How much is rent in Bologna?',
   'Where is my money going?',
+  'What will I have saved by then?',
+  'Am I on track?',
+  'What if I pick up another shift?',
 ];
 
 export function Chat({
   initialTurns,
   conversationId,
+  openers = OPENERS,
+  placeholder = 'Ask about your money',
+  intro = true,
+  embedded = false,
 }: {
   initialTurns: Turn[];
   conversationId: string | null;
+  /** The surface decides what it is good for; the chat only asks. */
+  openers?: string[];
+  placeholder?: string;
+  /**
+   * The Ask tab is nothing but this, so it needs to say what it is. Embedded
+   * in the savings goal the surrounding section already does, and two blocks
+   * introducing the same box is how a screen starts repeating itself.
+   */
+  intro?: boolean;
+  /**
+   * The Ask tab is the whole screen, so it stretches and pins its composer to
+   * the bottom. Inside the savings goal it is one section of a page that
+   * scrolls past it, where stretching leaves a hole and a pinned composer
+   * follows you over unrelated content.
+   */
+  embedded?: boolean;
 }) {
   const [turns, setTurns] = useState<Turn[]>(initialTurns);
   const [thread, setThread] = useState<string | null>(conversationId);
@@ -135,18 +168,22 @@ export function Chat({
   const empty = turns.length === 0;
 
   return (
-    <div className="flex flex-1 flex-col">
+    <div className={embedded ? 'flex flex-col' : 'flex flex-1 flex-col'}>
       <div className="flex-1 space-y-3">
         {empty && (
-          <Card className="px-5 py-5">
-            <p className="t-heading">Ask about your money</p>
-            <p className="t-caption mt-1 text-fg-secondary">
-              It can see your roster, your rate, your goal and your spending &mdash; so it
-              answers with your numbers, not general advice. Every figure comes from the
-              app&rsquo;s own arithmetic.
-            </p>
-            <div className="mt-3 flex flex-wrap gap-1.5">
-              {OPENERS.map((o) => (
+          <div className={intro ? 'rounded-2xl border border-border px-5 py-5' : ''}>
+            {intro && (
+              <>
+                <p className="t-heading">Ask about your money</p>
+                <p className="t-caption mt-1 text-fg-secondary">
+                  It can see your roster, your rate, your goal and your spending &mdash; so
+                  it answers with your numbers, not general advice. Every figure comes from
+                  the app&rsquo;s own arithmetic.
+                </p>
+              </>
+            )}
+            <div className={`flex flex-wrap gap-1.5 ${intro ? 'mt-3' : ''}`}>
+              {openers.map((o) => (
                 <button
                   key={o}
                   type="button"
@@ -157,7 +194,7 @@ export function Chat({
                 </button>
               ))}
             </div>
-          </Card>
+          </div>
         )}
 
         {turns.map((turn, i) =>
@@ -205,12 +242,16 @@ export function Chat({
           e.preventDefault();
           void send(input);
         }}
-        className="sticky bottom-0 mt-4 flex gap-2 bg-surface pb-[max(0.5rem,env(safe-area-inset-bottom))] pt-2"
+        className={
+          embedded
+            ? 'mt-3 flex gap-2'
+            : 'sticky bottom-0 mt-4 flex gap-2 bg-surface pb-[max(0.5rem,env(safe-area-inset-bottom))] pt-2'
+        }
       >
         <input
           value={input}
           onChange={(e) => setInput(e.target.value)}
-          placeholder="Ask about your money"
+          placeholder={placeholder}
           enterKeyHint="send"
           className="t-body min-h-12 flex-1 rounded-xl bg-segment-track px-4 outline-none placeholder:text-fg-placeholder"
         />

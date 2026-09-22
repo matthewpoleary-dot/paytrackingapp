@@ -22,6 +22,8 @@ const {
   cashflow,
   goalArrival,
   shiftsToClose,
+  contributionRate,
+  goalStanding,
 } = await import('../lib/budget/calc.ts');
 const { isSpending, SPEND_CATEGORIES } = await import('../lib/budget/types.ts');
 const { sumCents } = await import('../lib/pay/money.ts');
@@ -309,4 +311,76 @@ test('when the goal is reached', async (t) => {
     assert.equal(shiftsToClose(-500, 9300), 0, 'already there');
     assert.equal(shiftsToClose(30000, 0), null, 'a worthless shift closes nothing');
   });
+});
+
+/* -- Where the goal stands -------------------------------------------------
+   This is the arithmetic behind the one sentence the app must always be able
+   to say, and three surfaces render it — the goal screen, /budget and the
+   AI's get_goal tool. They used to assemble it separately, which is three
+   chances to disagree about the same number. */
+
+const gave = (cents, on) => ({ amount_cents: cents, contributed_on: on });
+
+test('a rate needs two contributions, not one', () => {
+  assert.equal(contributionRate([]), null);
+  assert.equal(contributionRate([gave(10_000, '2026-01-01')]), null);
+});
+
+test('the rate is what was set aside per week, over the span it covers', () => {
+  // 300 + 250 across exactly four weeks.
+  const rate = contributionRate([gave(30_000, '2026-01-01'), gave(25_000, '2026-01-29')]);
+  assert.equal(rate, Math.round(55_000 / 4));
+});
+
+test('the rate uses what was kept, never what was earned', () => {
+  // Taking money back out lowers the rate; it is a withdrawal, not a gap.
+  const kept = contributionRate([gave(40_000, '2026-01-01'), gave(-10_000, '2026-01-15')]);
+  assert.equal(kept, Math.round(30_000 / 2));
+});
+
+test('standing reports late, and what would close it', () => {
+  const standing = goalStanding({
+    targetCents: 420_000,
+    contributions: [gave(30_000, '2026-01-01'), gave(25_000, '2026-01-29')],
+    today: '2026-01-29',
+    deadline: '2026-06-01',
+    typicalShiftCents: 9_300,
+  });
+
+  assert.equal(standing.savedCents, 55_000);
+  assert.ok(standing.perWeekCents > 0);
+  assert.equal(standing.arrival.reached, false);
+  // Far short of 4,200 at 137.50 a week, so it cannot land by June.
+  assert.ok(standing.arrival.weeksLate > 0);
+  assert.ok(standing.extraShifts > 0, 'a late goal should say how many shifts close it');
+});
+
+test('standing offers no projection without a rate', () => {
+  const standing = goalStanding({
+    targetCents: 420_000,
+    contributions: [gave(30_000, '2026-01-01')],
+    today: '2026-01-29',
+    deadline: '2026-06-01',
+    typicalShiftCents: 9_300,
+  });
+
+  assert.equal(standing.perWeekCents, null);
+  assert.equal(standing.arrival.arrivesOn, null);
+  // No rate means no shift count either: inventing one would be the exact
+  // failure the tool surface exists to prevent.
+  assert.equal(standing.extraShifts, null);
+});
+
+test('a reached goal is reached, and says nothing about being late', () => {
+  const standing = goalStanding({
+    targetCents: 50_000,
+    contributions: [gave(30_000, '2026-01-01'), gave(25_000, '2026-01-29')],
+    today: '2026-01-29',
+    deadline: '2026-06-01',
+    typicalShiftCents: 9_300,
+  });
+
+  assert.equal(standing.arrival.reached, true);
+  assert.equal(standing.arrival.remainingCents, 0);
+  assert.equal(standing.extraShifts, null);
 });

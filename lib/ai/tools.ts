@@ -17,7 +17,6 @@ import {
   goalArrival,
   goalTarget,
   outgoingPerWeek,
-  outgoingsTotalIn,
   shiftsToClose,
   spendingByCategory,
 } from '@/lib/budget/calc';

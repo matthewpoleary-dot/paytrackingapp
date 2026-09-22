@@ -292,3 +292,72 @@ export function shiftsToClose(gapCents: number, typicalShiftCents: number): numb
   if (typicalShiftCents <= 0) return null;
   return Math.ceil(gapCents / typicalShiftCents);
 }
+
+/* -- Where the goal actually stands ----------------------------------------
+   The one sentence the app must always be able to say:
+
+     "€4,200 by August. You're at €1,150. At the rate you're setting aside you
+      land in October — six weeks late. Six extra Sundays closes it."
+
+   Every clause of that is arithmetic, so all of it lives here rather than in
+   a page or, worse, in the model. The goal screen, /budget and the AI's
+   get_goal tool were each assembling it separately, which is three chances
+   for three screens to disagree about the same number.
+   ------------------------------------------------------------------------ */
+
+export interface Standing {
+  savedCents: number;
+  /** What has actually been set aside per week, or null if too few entries. */
+  perWeekCents: number | null;
+  arrival: GoalArrival;
+  /** Extra shifts of a typical size that would close the gap, if it is late. */
+  extraShifts: number | null;
+}
+
+/**
+ * The rate is what has actually been set aside, never what was earned.
+ *
+ * What you earn and what you keep are different numbers, and the projection
+ * is only honest if it uses the second. Needs two contributions to have a
+ * span at all; one entry is a data point, not a rate.
+ */
+export function contributionRate(
+  contributions: { amount_cents: number; contributed_on: string }[],
+): number | null {
+  if (contributions.length < 2) return null;
+
+  const dates = contributions.map((c) => c.contributed_on).sort();
+  const weeks = Math.max(
+    1,
+    (Date.parse(`${dates[dates.length - 1]}T00:00:00Z`) - Date.parse(`${dates[0]}T00:00:00Z`)) /
+      (7 * 86_400_000),
+  );
+
+  return Math.round(sumCents(contributions.map((c) => c.amount_cents)) / weeks);
+}
+
+export function goalStanding({
+  targetCents,
+  contributions,
+  today,
+  deadline,
+  typicalShiftCents,
+}: {
+  targetCents: number;
+  contributions: { amount_cents: number; contributed_on: string }[];
+  today: string;
+  deadline: string | null;
+  /** What one shift is typically worth, for "how many more would close it". */
+  typicalShiftCents: number;
+}): Standing {
+  const savedCents = sumCents(contributions.map((c) => c.amount_cents));
+  const perWeekCents = contributionRate(contributions);
+  const arrival = goalArrival(targetCents, savedCents, perWeekCents, today, deadline);
+
+  const extraShifts =
+    arrival.weeksLate !== null && perWeekCents !== null
+      ? shiftsToClose(arrival.weeksLate * perWeekCents, typicalShiftCents)
+      : null;
+
+  return { savedCents, perWeekCents, arrival, extraShifts };
+}
