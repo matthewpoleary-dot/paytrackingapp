@@ -64,6 +64,9 @@ ever parsing a payslip.
 
 ## Tabs
 
+*(Superseded 2026-09-21 — see v3 scope. Three tabs now: Shifts, Budget,
+Ask.)*
+
 - **This period** — shifts logged, what it's worth. *v1.*
 - **Holiday** — accrued annual leave and what it's worth. *Not v1* — see
   below.
@@ -84,7 +87,9 @@ Decided 2026-09-20. Build exactly this; resist adding to it.
 - **Holiday tab.** Shift logging comes first — holiday figures are only as
   good as the shift history behind them, and on day one there isn't any.
   `docs/PAY-RULES.md` has the accrual rules ready for when it lands.
-- **Login.** No auth screen in v1. Use a Supabase anonymous session so
+- **Login.** *(Overturned 2026-09-21 — see v3 scope. Google sign-in ships;
+  the anonymous session is gone. The RLS instruction below still stands
+  absolutely.)* No auth screen in v1. Use a Supabase anonymous session so
   there is still a real `user_id` — every table carries it and every RLS
   policy is live and tested from the first migration. An anonymous session
   upgrades to a real account later without migrating any data. Do **not**
@@ -111,6 +116,66 @@ recorded and last month would quietly become worth more than it was — which
 would destroy the app as evidence. The same column doubles as the per-shift
 override.
 
+## v3 scope
+
+Decided 2026-09-21 and 2026-09-22. **Where this section contradicts anything
+above it, this section wins.** Nothing below it — the bar, the rules, the
+money conventions, the working agreement — is affected.
+
+Tally stops being a pay calculator and becomes a savings hub for one
+part-time worker saving for Erasmus. Everything serves one sentence the app
+must always be able to say: *€4,200 by August. You're at €1,150. At the rate
+you're setting aside you land in October — six weeks late. Six extra Sundays
+closes it.*
+
+**Three tabs: Shifts, Budget, Ask.** This supersedes the Tabs section above.
+The Holiday tab is still not built.
+
+**Rules this overturns.** Each is marked at its source above.
+
+1. **Google sign-in replaces the anonymous session.** Anonymous was
+   device-bound, and the app now holds a year of pay and savings history plus
+   bank transactions. Losing that to a cleared cache is not acceptable. The
+   RLS half of that original rule is untouched and still absolute.
+2. **CSV import of the user's own statements is in.** Revolut's export
+   format, hardcoded. Still no OCR, no PDF parsing, no open banking, no
+   aggregator — the objection was never to reading a statement, it was to
+   building an import pipeline. One parser for one bank is not a pipeline.
+3. **The design direction is being replaced.** Forest green, bone and brass
+   are retired, and `tighsauna.com` is no longer the reference. See the
+   Design direction section, which is being rewritten by the work in
+   `docs/OVERHAUL-PROMPT.md`. What survives: flat, no shadows, large text
+   light and tight, tracking as a function of size, money never
+   accent-coloured, one accent carrying exactly one meaning.
+
+**Decisions that are settled and are not to be relitigated:**
+
+- **The AI proposes; the user confirms.** Every write it makes is a card the
+  user taps. Nothing writes silently.
+- **The model narrates, the code calculates.** Every euro figure the AI
+  states comes back from a tool that computed it in `lib/pay` or
+  `lib/budget`. It never totals a list itself. Rule 4 exists because Claude
+  asserted a pay figure from memory once already in this project; an AI
+  inventing a budget number is the same bug wearing a different hat.
+- **Memory is the schema, not the transcript.** Durable facts — destination,
+  departure month, rent, the buffer not to dip below — live in rows the rest
+  of the app can compute with. A transcript nobody can query is not memory.
+- **Provider: Google Gemini's free tier**, decided 2026-09-22 on cost, behind
+  `lib/ai/client.ts` so nothing else imports the SDK. Free tiers move
+  constantly; switching must cost one file. The free tier is acceptable for
+  bank data only because EEA users get the paid data terms — verify that
+  before importing a real statement.
+- **The savings goal is a cost breakdown, not a number.** Lines, each with an
+  amount and a confidence: `quoted`, `researched`, `guess`. The target is the
+  sum, and it improves as real figures arrive.
+- **No streaks.** Rejected 2026-09-21: the weekly ritual is the cadence, and
+  a daily counter on a data-entry chore rewards fabricated entries, which
+  would destroy the log's value as evidence.
+
+**Still out:** holiday tab, OCR, open banking, PAYE/USC/PRSI, a component
+library, identity linking for when the TCD account is disabled (noted, not
+built).
+
 ## The bar
 
 **The competitor is the Notes app.** If logging a shift is slower than
@@ -130,7 +195,9 @@ that holds user data carries a `user_id` and an RLS policy, even while
 there's exactly one user. Do not "simplify" this away — the point is that
 sharing it later isn't a rewrite.
 
-**No payslip parsing.** The app computes what you're owed; the user
+**No payslip parsing.** *(Partly overturned 2026-09-21 — see v3 scope.
+Revolut CSV import is in. Payslip parsing and OCR are still out.)* The app
+computes what you're owed; the user
 compares that to what actually landed. There is no payslip import, no OCR,
 no bank integration.
 
@@ -147,6 +214,12 @@ Tailwind · Vercel. Sentry once there are real users. No Stripe — this is
 not a paid product.
 
 ## Design direction
+
+*(Being replaced, 2026-09-22 — see v3 scope. The palette and the
+`tighsauna.com` reference are retired; `docs/OVERHAUL-PROMPT.md` carries the
+new direction. The two rules below the palette — flat with no shadows, and
+large text set light and tight — survive unchanged and are why this section
+is not simply deleted.)*
 
 Structure from Apple Health: a recessed page field, raised grouped cards,
 generous whitespace, data-dense but calm.

@@ -1,5 +1,24 @@
 # Design audit — the dashboard reads as generated
 
+> **Superseded 2026-09-22.** This was written against the forest-green
+> build, which no longer exists. Its contrast table and several of its
+> findings are stale — they are struck through below rather than deleted, so
+> the reasoning survives. The live brief is `docs/OVERHAUL-PROMPT.md`.
+>
+> **Still true, and the durable part:** the method. Measure contrast against
+> real surfaces with alpha composited, screenshot at 390×844 in both worlds,
+> check empty *and* populated, never eyeball a number you could compute.
+>
+> **Findings still open:** the legend for absent data, the orphaned "Tap any
+> day" copy, near-uniform spacing that groups nothing, and treating the empty
+> state as a real screen rather than four zeroes.
+>
+> **Findings now fixed:** the €0.00 hero (it dominates properly now), the
+> dead pay-period arrow (gone), and the month grid (replaced by a date
+> strip). Card soup is half fixed — the dashboard's main card is
+> hairline-outlined, every other screen still uses filled cards.
+
+
 Paste into Claude Code, or: *read `docs/DESIGN-AUDIT.md` and do it.*
 
 ---
