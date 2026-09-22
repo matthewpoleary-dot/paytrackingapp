@@ -100,32 +100,21 @@ export function NavRow({
 }
 
 /**
- * The headline region: whatever number a screen exists to state.
+ * A grouped region. A hairline on the page field — never a fill.
  *
- * A hairline, not a fill. Every one of these was an inverted dark card until
- * the Discovery Series palette landed, and five dark slabs across five
- * screens were the heaviest thing in the app — the figure was being carried
- * by its background rather than by its size.
+ * Every card used to carry --surface-raised, a second surface a shade off the
+ * page. Enough of them and the screen reads as a dashboard however flat the
+ * shadows are: a stack of filled rectangles is the shape, and the fill is
+ * what makes each one an object competing with its neighbours.
  *
- * On a map sheet nothing is a filled block. Rank comes from ink weight and
- * from space, so the figure keeps the hero ramp and everything around it goes
- * quiet instead.
+ * On a map sheet nothing is a filled block. Separation comes from the rule
+ * and from space, so this draws one hairline and otherwise gets out of the
+ * way. Where two things need separating and neither is a group, use space
+ * instead of reaching for this.
+ *
+ * The one exception in the app is the "not settled yet" card, which keeps a
+ * fill because the fill IS the signal — see NextStep in app/page.tsx.
  */
-export function Panel({
-  children,
-  className = '',
-}: {
-  children: ReactNode;
-  className?: string;
-}) {
-  return (
-    <section className={`rounded-2xl border border-border px-5 py-5 ${className}`}>
-      {children}
-    </section>
-  );
-}
-
-/** A raised surface. Flat — separation comes from the surface step, not shadow. */
 export function Card({
   children,
   className = '',
@@ -133,7 +122,9 @@ export function Card({
   children: ReactNode;
   className?: string;
 }) {
-  return <section className={`rounded-2xl bg-surface-raised ${className}`}>{children}</section>;
+  return (
+    <section className={`rounded-2xl border border-border ${className}`}>{children}</section>
+  );
 }
 
 /** A hairline-separated list inside a Card. */
@@ -222,7 +213,7 @@ export function SecondaryLink({ href, children }: { href: string; children: Reac
 
 export function ErrorNote({ children }: { children: ReactNode }) {
   return (
-    <p role="alert" className="t-caption mt-4 rounded-xl bg-surface-raised px-4 py-3 text-critical">
+    <p role="alert" className="t-caption mt-4 rounded-xl border border-border px-4 py-3 text-critical">
       {children}
     </p>
   );
@@ -231,9 +222,12 @@ export function ErrorNote({ children }: { children: ReactNode }) {
 /** Empty states say what to do next, not merely that there is nothing here. */
 export function Empty({ title, children }: { title: string; children?: ReactNode }) {
   return (
-    <Card className="px-5 py-8 text-center">
+    // No container. A sentence saying there is nothing here does not need a
+    // box drawn around the nothing — the space above and below separates it
+    // from whatever comes next, which is the whole point of the rule.
+    <div className="px-1 py-6">
       <p className="t-heading">{title}</p>
-      {children && <p className="t-caption mt-1.5 text-fg-secondary">{children}</p>}
-    </Card>
+      {children && <p className="t-caption mt-1.5 max-w-[46ch] text-fg-secondary">{children}</p>}
+    </div>
   );
 }

@@ -22,7 +22,13 @@ import {
 import { CATEGORY_LABEL } from '@/lib/budget/types';
 import { valueShift } from '@/lib/pay/calc';
 import { addDays, dublinDate } from '@/lib/time/dublin';
-import { Card, Group, GroupRow, Money, Screen, Panel } from '@/app/_components/ui';
+import {
+  Card,
+  Group,
+  GroupRow,
+  Money,
+  Screen,
+} from '@/app/_components/ui';
 import { TabBar } from '@/app/_components/TabBar';
 import { CsvImport, GoalLineForm, OutgoingForm } from './BudgetForms';
 import { endOutgoing } from './actions';
@@ -90,7 +96,7 @@ export default async function BudgetPage() {
       </header>
 
       {/* -- The sentence the app exists to say. -------------------------- */}
-      <Panel className="px-6 py-6">
+      <Card className="px-6 py-6">
         {goal && target.cents > 0 ? (
           <>
             <p className="t-caption text-fg-secondary">
@@ -120,7 +126,7 @@ export default async function BudgetPage() {
             </p>
           </>
         )}
-      </Panel>
+      </Card>
 
       {/* -- What the goal is made of. ------------------------------------ */}
       <section className="mt-6">
@@ -162,14 +168,14 @@ export default async function BudgetPage() {
         {goal ? (
           <GoalLineForm />
         ) : (
-          <Card className="px-5 py-4">
+          <div className="px-1">
             <p className="t-caption text-fg-secondary">
               Set a goal first, then add what it costs.
             </p>
-            <Link href="/goal" className="t-caption mt-2 inline-flex min-h-11 items-center underline">
+            <Link href="/goal" className="t-caption mt-1 inline-flex min-h-11 items-center underline">
               Set a goal
             </Link>
-          </Card>
+          </div>
         )}
       </section>
 
@@ -214,12 +220,12 @@ export default async function BudgetPage() {
            mean magnitude only. */}
       <section className="mt-6">
         <p className="t-label mb-2 px-1 text-fg-secondary">Where it went</p>
-        <Card className="px-5 py-4">
-          {spending.length === 0 ? (
-            <p className="t-caption py-4 text-center text-fg-secondary">
-              No spending recorded yet. Import a statement below.
-            </p>
-          ) : (
+        {spending.length === 0 ? (
+          <p className="t-caption px-1 text-fg-secondary">
+            No spending recorded yet. Import a statement below.
+          </p>
+        ) : (
+          <Card className="px-5 py-4">
             <figure className="m-0 space-y-2.5">
               {spending.map((s) => (
                 <div key={s.category}>
@@ -251,8 +257,8 @@ export default async function BudgetPage() {
                 </table>
               </figcaption>
             </figure>
-          )}
-        </Card>
+          </Card>
+        )}
       </section>
 
       {/* -- Outgoings. ----------------------------------------------------- */}

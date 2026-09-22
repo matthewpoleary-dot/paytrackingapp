@@ -25,8 +25,11 @@
 
 :root {
   /* Bone world */
+  /* There is no --surface-raised. Cards are hairlines on this field, not a
+     second surface a shade off it — a stack of filled rectangles reads as a
+     dashboard however flat the shadows are. --surface-sunken survives for
+     inset controls, which are genuinely below the page rather than above it. */
   --surface:         #e9e7de;
-  --surface-raised:  #f3f1ea;
   --surface-sunken:  #ddd9ce;
   --surface-inverse: #24231f;
 
@@ -78,7 +81,6 @@
   :root {
     /* Forest world */
     --surface:         #17181a;
-    --surface-raised:  #202124;
     --surface-sunken:  #121314;
     --surface-inverse: #f0eee6;
 
@@ -112,7 +114,6 @@
 
 @theme inline {
   --color-surface:         var(--surface);
-  --color-surface-raised:  var(--surface-raised);
   --color-surface-sunken:  var(--surface-sunken);
   --color-surface-inverse: var(--surface-inverse);
   --color-surface-chrome:  var(--surface-chrome);

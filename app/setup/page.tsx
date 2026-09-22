@@ -42,7 +42,7 @@ export default function SetupPage() {
       <form action={formAction} className="flex flex-1 flex-col">
         {/* -- The rate. The hero, because it is the number everything else
                is derived from. ------------------------------------------- */}
-        <section className="rounded-2xl bg-surface-raised px-5 py-4">
+        <section className="rounded-2xl border border-border px-5 py-4">
           <label
             htmlFor="rate"
             className="t-caption block text-center text-fg-secondary"
@@ -77,7 +77,7 @@ export default function SetupPage() {
         </section>
 
         {/* -- The other three, as one grouped list. -------------------- */}
-        <section className="mt-3 overflow-hidden rounded-2xl bg-surface-raised">
+        <section className="mt-3 overflow-hidden rounded-2xl border border-border">
           <Row
             question="Are your breaks paid?"
             note="Irish law gives no right to paid breaks, so only your contract can say."
@@ -166,7 +166,7 @@ export default function SetupPage() {
         {state.error && (
           <p
             role="alert"
-            className="t-caption mt-4 rounded-xl bg-surface-raised px-4 py-3 text-critical"
+            className="t-caption mt-4 rounded-xl border border-border px-4 py-3 text-critical"
           >
             {state.error}
           </p>

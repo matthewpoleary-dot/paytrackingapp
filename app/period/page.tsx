@@ -25,7 +25,6 @@ import {
   Group,
   GroupRow,
   Money,
-  Panel,
   PrimaryLink,
   Screen,
   SecondaryLink,
@@ -109,7 +108,7 @@ export default async function ThisPeriod(props: PageProps<'/period'>) {
       )}
 
       {/* -- The number. The whole point of the screen. ------------------- */}
-      <Panel className="px-6 py-7">
+      <Card className="px-6 py-7">
         <p className="t-caption text-fg-secondary">{worthLabel}</p>
         <p className="mt-2">
           <Money cents={value.cents} estimated={value.estimated} size="hero" />
@@ -119,12 +118,15 @@ export default async function ThisPeriod(props: PageProps<'/period'>) {
             ? 'No shifts logged yet'
             : `${value.shiftCount} shift${value.shiftCount === 1 ? '' : 's'} · ${formatMinutes(value.paidMinutes)} paid`}
         </p>
-      </Panel>
+      </Card>
 
       {/* -- Why it is still a guess, and what to do about it. ------------ */}
       {unconfirmed.length > 0 && (
         <Link href="/confirm" className="mt-3 block">
-          <Card className="flex items-center justify-between gap-3 border border-attention-wash bg-attention-wash px-5 py-4">
+          {/* The one card in the app that keeps a fill: the fill IS the
+              signal. Everything around it is a hairline now, so this reads
+              louder than it did when every card was filled. */}
+          <Card className="flex items-center justify-between gap-3 border-attention/35 bg-attention-wash px-5 py-4">
             <div>
               <p className="t-heading text-attention">
                 {unconfirmed.length} shift{unconfirmed.length === 1 ? '' : 's'} to confirm

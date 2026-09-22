@@ -4,7 +4,13 @@ import { aggregate } from '@/lib/pay/aggregate';
 import { formatMinutes } from '@/lib/pay/calc';
 import { valueShift } from '@/lib/pay/calc';
 import { dublinClock, dublinDate, isSundayWorkDate } from '@/lib/time/dublin';
-import { EstimateNote, Money, PageHeader, Screen, Panel } from '@/app/_components/ui';
+import {
+  Card,
+  EstimateNote,
+  Money,
+  PageHeader,
+  Screen,
+} from '@/app/_components/ui';
 import { AddShiftForm, EditShiftForm, type EditableShift } from './DayEditor';
 
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
@@ -52,7 +58,7 @@ export default async function DayPage(props: PageProps<'/day/[date]'>) {
       />
 
       {shifts.length > 0 && (
-        <Panel className="mb-3 px-5 py-5">
+        <Card className="mb-3 px-5 py-5">
           <p className="t-caption text-fg-secondary">
             {value.estimated ? 'Worth about' : 'Worth'}
           </p>
@@ -63,7 +69,7 @@ export default async function DayPage(props: PageProps<'/day/[date]'>) {
             {value.shiftCount} shift{value.shiftCount === 1 ? '' : 's'} &middot;{' '}
             {formatMinutes(value.paidMinutes)} paid
           </p>
-        </Panel>
+        </Card>
       )}
 
       <div className="space-y-3">

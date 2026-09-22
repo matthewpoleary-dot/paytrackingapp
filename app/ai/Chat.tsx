@@ -193,7 +193,7 @@ export function Chat({
         )}
 
         {error && (
-          <p role="alert" className="t-caption rounded-xl bg-surface-raised px-4 py-3 text-critical">
+          <p role="alert" className="t-caption rounded-xl border border-border px-4 py-3 text-critical">
             {error}
           </p>
         )}
@@ -212,7 +212,7 @@ export function Chat({
           onChange={(e) => setInput(e.target.value)}
           placeholder="Ask about your money"
           enterKeyHint="send"
-          className="t-body min-h-12 flex-1 rounded-xl bg-surface-raised px-4 outline-none placeholder:text-fg-placeholder"
+          className="t-body min-h-12 flex-1 rounded-xl bg-segment-track px-4 outline-none placeholder:text-fg-placeholder"
         />
         <button
           type="submit"

@@ -94,8 +94,9 @@ function contrast(fg, bg) {
    instead. */
 
 const CHECKS = [
-  // --- The page field and the cards on it. --------------------------------
-  ...['surface', 'surface-raised'].flatMap((bg) => [
+  // --- The page field. Cards are hairlines on it, so there is no second
+  //     surface for text to land on. -------------------------------------
+  ...['surface'].flatMap((bg) => [
     { fg: 'fg', bg, use: 'text', note: 'body and headings' },
     { fg: 'fg-secondary', bg, use: 'text', note: 'captions and labels' },
     { fg: 'fg-tertiary', bg, use: 'text', note: 'stat notes, nav row chevrons' },
@@ -133,8 +134,8 @@ const CHECKS = [
 
   // --- Fixed chrome. Content scrolls under it, so the worst case is the
   //     chrome over the raised surface rather than over the field. ---------
-  { fg: 'fg', bg: 'surface-chrome', on: 'surface-raised', use: 'text', note: 'tab bar, active' },
-  { fg: 'fg-secondary', bg: 'surface-chrome', on: 'surface-raised', use: 'text', note: 'tab bar, inactive' },
+  { fg: 'fg', bg: 'surface-chrome', on: 'surface', use: 'text', note: 'tab bar, active' },
+  { fg: 'fg-secondary', bg: 'surface-chrome', on: 'surface', use: 'text', note: 'tab bar, inactive' },
 ];
 
 const TARGET = { text: 4.5, large: 3, ui: 3 };

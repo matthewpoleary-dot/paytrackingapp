@@ -3,7 +3,15 @@ import { getContributions, getGoal, getSettings } from '@/lib/db/queries';
 import { project } from '@/lib/pay/projection';
 import { formatCents } from '@/lib/pay/money';
 import { dublinDate } from '@/lib/time/dublin';
-import { Card, Empty, Group, GroupRow, Money, PageHeader, Screen, Panel } from '@/app/_components/ui';
+import {
+  Card,
+  Empty,
+  Group,
+  GroupRow,
+  Money,
+  PageHeader,
+  Screen,
+} from '@/app/_components/ui';
 import { ContributionForm, GoalForm } from './GoalForms';
 import { deleteContribution } from './actions';
 
@@ -35,7 +43,7 @@ export default async function GoalPage() {
       />
 
       {goal && p && (
-        <Panel className="mb-3 px-6 py-6">
+        <Card className="mb-3 px-6 py-6">
           <p className="t-caption text-fg-secondary">
             {p.reached ? 'Target reached' : 'Set aside so far'}
           </p>
@@ -65,7 +73,7 @@ export default async function GoalPage() {
               ? 'Nothing left to save. Set a new target whenever you like.'
               : `${formatCents(p.remainingCents)} to go`}
           </p>
-        </Panel>
+        </Card>
       )}
 
       {goal && p && !p.reached && (
