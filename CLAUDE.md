@@ -145,6 +145,18 @@ Marked inline above, listed here so there is one place to find them:
   deleted; no migration path is built for them.
 - **The AI proposes; the user confirms.** Every write it makes is a card
   the user taps. It never writes silently.
+- **Why a free tier is acceptable for bank data (added 2026-09-23).** This is
+  load-bearing and was previously written down nowhere. The free Gemini tier
+  was accepted for a statement containing real transactions **solely because
+  Google applies its paid-services data terms to users in the EEA, the UK and
+  Switzerland** — i.e. prompts are not used to improve the models. Outside
+  that region the free tier's terms are different and this decision does not
+  hold. **Checked 2026-09-22 against the account in use; re-verify before any
+  deploy that serves users elsewhere, and before assuming it still holds.**
+  The mitigation that survives either way: no transaction description or
+  merchant name is ever sent to the model — only computed aggregates. See
+  `lib/ai/tools.ts`.
+
 - **Web search is on.** Without it the model answers "what's rent in
   Bologna" from memory, which is the same failure as inventing a Sunday
   multiplier. With it the figure carries a citation that gets stored.

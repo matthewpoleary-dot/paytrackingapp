@@ -161,33 +161,48 @@ export async function importCsv(
     };
   }
 
-  let added = 0;
-  let already = 0;
+  // One statement, so it either lands or it does not. Row by row, a failure
+  // at row 400 of 500 left the user with 399 rows, an error message and no
+  // way to tell which — and re-importing then depended on the key being
+  // right, which is the other half of this bug.
+  const { data: inserted, error } = await supabase
+    .from('txn')
+    .upsert(
+      parsed.rows.map((row) => ({
+        user_id: user.id,
+        posted_on: row.posted_on,
+        description: row.description,
+        amount_cents: row.amount_cents,
+        currency: row.currency,
+        category: row.category,
+        categorised_by: 'model' as const,
+        source: 'revolut_csv' as const,
+        external_id: row.external_id,
+      })),
+      { onConflict: 'user_id,source,external_id', ignoreDuplicates: true },
+    )
+    .select('id');
 
-  // One at a time so a single duplicate does not reject the whole batch.
-  for (const row of parsed.rows) {
-    const { error } = await supabase.from('txn').insert({
-      user_id: user.id,
-      posted_on: row.posted_on,
-      description: row.description,
-      amount_cents: row.amount_cents,
-      category: row.category,
-      categorised_by: 'model',
-      source: 'revolut_csv',
-      external_id: row.external_id,
-    });
-    if (!error) added++;
-    else if (/duplicate key/i.test(error.message)) already++;
-    else return { error: error.message };
-  }
+  if (error) return { error: error.message };
+
+  const added = inserted?.length ?? 0;
+  const already = parsed.rows.length - added;
 
   revalidatePath('/budget');
   revalidatePath('/');
 
+  // Every count is stated, because "nothing happened" and "you already had
+  // all of these" look identical otherwise.
   const parts = [`${added} added`];
-  if (already) parts.push(`${already} already there`);
+  if (already) parts.push(`${already} already imported`);
   if (parsed.pending) parts.push(`${parsed.pending} still pending, skipped`);
   if (parsed.skipped.length) parts.push(`${parsed.skipped.length} unreadable`);
+
+  // Captured, but deliberately not summed into euro totals.
+  const foreign = Object.entries(parsed.foreign);
+  for (const [code, count] of foreign) {
+    parts.push(`${count} in ${code}, stored but not counted`);
+  }
 
   return { message: parts.join(' · ') };
 }

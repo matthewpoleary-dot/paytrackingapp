@@ -13,7 +13,7 @@ export interface Turn {
   tools: string[];
   proposals: {
     proposal: true;
-    kind: 'goal_line' | 'outgoing' | 'profile_fact' | 'txn_category';
+    kind: 'goal_line' | 'outgoing' | 'profile_fact';
     payload: Record<string, unknown>;
     reasoning: string;
   }[];

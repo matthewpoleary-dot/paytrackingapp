@@ -24,6 +24,7 @@ const {
   shiftsToClose,
   contributionRate,
   goalStanding,
+  duplicatedByOutgoings,
 } = await import('../lib/budget/calc.ts');
 const { isSpending, SPEND_CATEGORIES } = await import('../lib/budget/types.ts');
 const { sumCents } = await import('../lib/pay/money.ts');
@@ -383,4 +384,108 @@ test('a reached goal is reached, and says nothing about being late', () => {
   assert.equal(standing.arrival.reached, true);
   assert.equal(standing.arrival.remainingCents, 0);
   assert.equal(standing.extraShifts, null);
+});
+
+/* -- Rent is one payment, not two -----------------------------------------
+   A recurring outgoing and its own bank line are the same money. Subtracting
+   both understated the surplus by a month's rent and ran the goal projection
+   about ten weeks pessimistic — and the model repeated it faithfully, because
+   a tool had computed it. */
+
+const RENT = 60_000;
+const MONTH = ['2026-09-01', '2026-09-30'];
+
+test('a commitment and its matching bank line are counted once', () => {
+  // A weekly cadence over a seven-day window, so the pro-rata IS the actual
+  // amount and all three figures are directly comparable. Over a month the
+  // pro-rata differs from the payment by design — outgoingCostIn spreads a
+  // commitment across an arbitrary window — and that is tested separately.
+  const WEEK = ['2026-09-07', '2026-09-13'];
+  const RENT_W = 15_000;
+  const earned = 40_000;
+
+  const o = outgoing({ amount_cents: RENT_W, cadence: 'weekly', category: 'rent' });
+  const t = txn({ amount_cents: -RENT_W, category: 'rent', posted_on: '2026-09-08' });
+
+  const outgoingOnly = cashflow(earned, [o], [], ...WEEK);
+  const txnOnly = cashflow(earned, [], [t], ...WEEK);
+  const both = cashflow(earned, [o], [t], ...WEEK);
+
+  // The finding: recording it in both places must not charge it twice.
+  assert.equal(outgoingOnly.surplusCents, txnOnly.surplusCents, 'fixture is comparable');
+  assert.equal(both.surplusCents, outgoingOnly.surplusCents);
+  assert.equal(both.surplusCents, txnOnly.surplusCents);
+  assert.equal(both.surplusCents, earned - RENT_W);
+
+  // Both figures stay independently visible.
+  assert.equal(both.outgoingsCents, RENT_W, 'what they committed to');
+  assert.equal(both.spendingCents, RENT_W, 'what actually left the account');
+  assert.equal(both.duplicatedCents, RENT_W);
+  assert.equal(both.discretionaryCents, 0);
+});
+
+test('over a month the commitment is the authority, not the bank line', () => {
+  // outgoingCostIn pro-ratas a monthly commitment onto the window, so the
+  // committed figure and the single payment differ. The bank line is then
+  // evidence the commitment happened, not a second charge.
+  const o = outgoing({ amount_cents: RENT, cadence: 'monthly', category: 'rent' });
+  const t = txn({ amount_cents: -RENT, category: 'rent', posted_on: '2026-09-02' });
+
+  const outgoingOnly = cashflow(120_000, [o], [], ...MONTH);
+  const both = cashflow(120_000, [o], [t], ...MONTH);
+
+  assert.equal(both.surplusCents, outgoingOnly.surplusCents);
+  assert.equal(both.duplicatedCents, RENT);
+  assert.equal(both.discretionaryCents, 0);
+});
+
+test('genuine spending on top of rent still counts', () => {
+  const o = outgoing({ amount_cents: RENT, cadence: 'monthly', category: 'rent' });
+  const rentLine = txn({ amount_cents: -RENT, category: 'rent', posted_on: '2026-09-02' });
+  const shopping = txn({ amount_cents: -4_500, category: 'groceries', posted_on: '2026-09-10' });
+
+  const flow = cashflow(120_000, [o], [rentLine, shopping], ...MONTH);
+  assert.equal(flow.duplicatedCents, RENT);
+  assert.equal(flow.discretionaryCents, 4_500);
+  assert.equal(flow.surplusCents, 120_000 - flow.outgoingsCents - 4_500);
+});
+
+test('a second rent-sized payment in one month is NOT swallowed', () => {
+  // Monthly cadence can produce one occurrence in a month. A second payment
+  // of the same size is real spending — hiding it would be the opposite
+  // mistake, and a worse one.
+  const o = outgoing({ amount_cents: RENT, cadence: 'monthly', category: 'rent' });
+  const first = txn({ amount_cents: -RENT, category: 'rent', posted_on: '2026-09-02' });
+  const second = txn({ amount_cents: -RENT, category: 'rent', posted_on: '2026-09-20' });
+
+  const flow = cashflow(200_000, [o], [first, second], ...MONTH);
+  assert.equal(flow.duplicatedCents, RENT, 'only one occurrence is covered');
+  assert.equal(flow.discretionaryCents, RENT);
+});
+
+test('matching is narrow: a different category or a different amount is not a duplicate', () => {
+  const o = outgoing({ amount_cents: RENT, cadence: 'monthly', category: 'rent' });
+
+  const wrongCategory = txn({ amount_cents: -RENT, category: 'shopping' });
+  assert.equal(duplicatedByOutgoings([o], [wrongCategory], ...MONTH).cents, 0);
+
+  // 1% of 60,000 is 600c; 2,000c out is well beyond it.
+  const wrongAmount = txn({ amount_cents: -(RENT - 2_000), category: 'rent' });
+  assert.equal(duplicatedByOutgoings([o], [wrongAmount], ...MONTH).cents, 0);
+
+  // Just inside tolerance: a rent that moved by a few cents still matches.
+  const nearlyRent = txn({ amount_cents: -(RENT + 300), category: 'rent' });
+  assert.equal(duplicatedByOutgoings([o], [nearlyRent], ...MONTH).cents, RENT + 300);
+});
+
+test('an ended outgoing covers nothing', () => {
+  const o = outgoing({
+    amount_cents: RENT,
+    cadence: 'monthly',
+    category: 'rent',
+    started_on: '2025-01-01',
+    ended_on: '2026-08-31',
+  });
+  const t = txn({ amount_cents: -RENT, category: 'rent', posted_on: '2026-09-02' });
+  assert.equal(duplicatedByOutgoings([o], [t], ...MONTH).cents, 0);
 });

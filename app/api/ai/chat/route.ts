@@ -9,6 +9,21 @@ export const maxDuration = 120;
 const MAX_TURNS = 12;
 
 /**
+ * How much of the thread is replayed.
+ *
+ * Every turn used to resend the entire conversation, including every stored
+ * tool payload — so cost grew quadratically with length and turn 20 carried
+ * nineteen turns of JSON that had already been answered. It would eventually
+ * stop working on context length rather than degrade.
+ *
+ * The durable half of memory is not in here anyway: facts live in
+ * profile_fact and arrive through the system prompt, which is what "memory is
+ * the schema, not the transcript" means. The transcript only has to carry
+ * enough for a follow-up question to make sense.
+ */
+const REPLAY_MESSAGES = 24;
+
+/**
  * The chat endpoint.
  *
  * Server-side only: the API key never reaches the browser, and every tool
@@ -53,16 +68,25 @@ export async function POST(request: Request) {
 
   // Replay the thread so the model has the history. Parts are stored in the
   // neutral shape, so a provider change does not strand the transcript.
+  // Newest first, capped, then flipped back — so the cap keeps the RECENT
+  // end of the conversation rather than the start of it.
   const { data: history } = await supabase
     .from('ai_message')
     .select('role, content')
     .eq('conversation_id', threadId)
-    .order('created_at', { ascending: true });
+    .order('created_at', { ascending: false })
+    .limit(REPLAY_MESSAGES);
 
-  const turns: Turn[] = (history ?? []).map((m) => ({
+  const turns: Turn[] = (history ?? []).reverse().map((m) => ({
     role: m.role === 'assistant' ? 'model' : 'user',
     parts: m.content as Part[],
   }));
+
+  // A window can open on a tool result whose call was trimmed away, which the
+  // provider rejects as an orphan. Drop any leading results.
+  while (turns.length > 0 && turns[0].parts.every((p) => p.kind === 'result')) {
+    turns.shift();
+  }
 
   const userParts: Part[] = [{ kind: 'text', text: message }];
   turns.push({ role: 'user', parts: userParts });

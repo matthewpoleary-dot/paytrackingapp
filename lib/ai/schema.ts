@@ -199,19 +199,4 @@ export const TOOLS: ToolSpec[] = [
       additionalProperties: false,
     },
   },
-  {
-    name: 'propose_txn_category',
-    description:
-      'Propose recategorising a transaction. Returns a card for the user to tap; it does NOT save.',
-    input_schema: {
-      type: 'object',
-      properties: {
-        txn_id: { type: 'string' },
-        category: { type: 'string', enum: [...SPEND_CATEGORIES] },
-        reasoning: { type: 'string', maxLength: 300 },
-      },
-      required: ['txn_id', 'category', 'reasoning'],
-      additionalProperties: false,
-    },
-  },
 ];

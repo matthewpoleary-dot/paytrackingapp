@@ -29,6 +29,7 @@ export type SpendCategory =
   | 'fees'
   | 'income'
   | 'transfer'
+  | 'refund'
   | 'other';
 
 export const SPEND_CATEGORIES: readonly SpendCategory[] = [
@@ -45,6 +46,7 @@ export const SPEND_CATEGORIES: readonly SpendCategory[] = [
   'fees',
   'income',
   'transfer',
+  'refund',
   'other',
 ];
 
@@ -62,6 +64,7 @@ export const CATEGORY_LABEL: Record<SpendCategory, string> = {
   fees: 'Fees',
   income: 'Income',
   transfer: 'Transfer',
+  refund: 'Refund',
   other: 'Other',
 };
 
@@ -71,8 +74,13 @@ export const CATEGORY_LABEL: Record<SpendCategory, string> = {
  * `transfer` is money moved to savings — counting it as spent would make
  * every good month look like a bad one. `income` is the mirror image: wages
  * landing are not a negative expense.
+ *
+ * `refund` is a refund the importer could not match to its purchase. It is
+ * excluded from BOTH, deliberately: calling it income overstates earnings,
+ * and there is no purchase here to reduce. A matched refund never reaches
+ * this list — it takes the original purchase's category and nets off there.
  */
-export const NON_SPEND: readonly SpendCategory[] = ['transfer', 'income'];
+export const NON_SPEND: readonly SpendCategory[] = ['transfer', 'income', 'refund'];
 
 export function isSpending(category: SpendCategory): boolean {
   return !NON_SPEND.includes(category);
@@ -103,8 +111,16 @@ export interface Txn {
   id: string;
   posted_on: string;
   description: string;
-  /** Signed: negative is money out, positive is money in. */
+  /**
+   * Signed: negative is money out, positive is money in. This is the NATIVE
+   * amount in `currency` and is never converted.
+   */
   amount_cents: number;
+  /**
+   * ISO 4217. Non-EUR rows are captured so the record is complete, and kept
+   * out of euro totals until there is a rate policy with a date on it.
+   */
+  currency: string;
   category: SpendCategory;
   categorised_by: CategorisedBy;
   source: TxnSource;

@@ -251,11 +251,21 @@ export async function getTxns(from: string, to: string): Promise<Txn[]> {
   const supabase = await createClient();
   const { data, error } = await supabase
     .from('txn')
-    .select('id, posted_on, description, amount_cents, category, categorised_by, source, external_id')
+    .select(
+      'id, posted_on, description, amount_cents, currency, category, categorised_by, source, external_id',
+    )
     .gte('posted_on', from)
     .lte('posted_on', to)
     .order('posted_on', { ascending: false });
-  if (error) return [];
+
+  // Said out loud. Returning [] on error makes a missing migration look
+  // exactly like an empty statement, and "no transactions" is a plausible
+  // enough state that nobody would question it — which is how a schema that
+  // was never applied survives a whole session of testing.
+  if (error) {
+    console.error('[db] getTxns failed:', error.message);
+    return [];
+  }
   return data ?? [];
 }
 

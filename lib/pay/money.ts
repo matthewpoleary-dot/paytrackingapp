@@ -10,6 +10,17 @@
  * app's credibility as a record.
  */
 export function roundToCents(exactCents: number): number {
+  // OPEN QUESTION, raised 2026-09-23, not yet decided by Matthew.
+  //
+  // This is half-up toward +infinity, which for wages — always positive — is
+  // exactly the rule CLAUDE.md states. For a NEGATIVE amount it becomes half
+  // DOWN by magnitude: -10.505 rounds to -10.50, not -10.51.
+  //
+  // Currently unreachable: Revolut exports two decimal places, so nothing in
+  // the import ever needs a third-decimal rounding decision. It is written
+  // down because CLAUDE.md says rounding is a domain decision to ask about
+  // rather than pick, and because the budget layer now shares this function
+  // with the pay layer. Do not "fix" it without asking.
   return Math.floor(exactCents + 0.5);
 }
 

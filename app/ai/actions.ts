@@ -4,6 +4,7 @@ import { revalidatePath } from 'next/cache';
 import { createClient } from '@/lib/supabase/server';
 import { getGoal } from '@/lib/db/queries';
 import { dublinDate } from '@/lib/time/dublin';
+import { SPEND_CATEGORIES } from '@/lib/budget/types';
 
 /**
  * Confirming a proposal.
@@ -12,6 +13,14 @@ import { dublinDate } from '@/lib/time/dublin';
  * calls. An ordinary server action, with the same validation any other form
  * would get — a proposal arriving from a model is untrusted input exactly
  * like a proposal arriving from a text field.
+ *
+ * There is deliberately no txn_category case. The model cannot see
+ * transactions at all, which is what keeps a bank statement's text out of
+ * its context entirely, so recategorising lives in the Budget tab where the
+ * user picks from the closed enum themselves. The tool that used to be here
+ * needed a txn_id no read tool could supply, so it could only be called with
+ * an invented one — which matched no row, changed nothing, and still
+ * reported success.
  */
 
 export interface ConfirmResult {
@@ -73,6 +82,13 @@ export async function confirmProposal(
         return { ok: false, error: 'That amount does not look right.' };
       }
       if (!CADENCES.includes(cadence)) return { ok: false, error: 'Unknown cadence.' };
+
+      // Validated here as well as by the enum column, so a bad value from the
+      // model reads as a sentence rather than a constraint violation.
+      const category = String(payload.category ?? 'other');
+      if (!SPEND_CATEGORIES.includes(category as never)) {
+        return { ok: false, error: 'Unknown category.' };
+      }
       if (!ISO_DATE.test(startedOn)) return { ok: false, error: 'That start date does not look right.' };
 
       const { error } = await supabase.from('outgoing').insert({
@@ -80,7 +96,7 @@ export async function confirmProposal(
         label: String(payload.label ?? '').slice(0, 80),
         amount_cents: amount,
         cadence,
-        category: String(payload.category ?? 'other'),
+        category,
         started_on: startedOn,
       });
       if (error) return { ok: false, error: error.message };
@@ -105,18 +121,6 @@ export async function confirmProposal(
         },
         { onConflict: 'user_id,key' },
       );
-      if (error) return { ok: false, error: error.message };
-      break;
-    }
-
-    case 'txn_category': {
-      const id = String(payload.txn_id ?? '');
-      if (!id) return { ok: false, error: 'No transaction given.' };
-
-      const { error } = await supabase
-        .from('txn')
-        .update({ category: String(payload.category ?? 'other'), categorised_by: 'user' })
-        .eq('id', id);
       if (error) return { ok: false, error: error.message };
       break;
     }

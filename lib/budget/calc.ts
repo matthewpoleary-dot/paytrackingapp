@@ -86,22 +86,66 @@ export interface CategoryTotal {
  * transfers to savings and incoming wages are both excluded, because
  * counting either would answer a different question than the one asked.
  */
+/**
+ * The reporting currency. Everything summed here is euro.
+ *
+ * Foreign rows are captured at import so the record is complete, but they are
+ * NOT converted and must never be added to a euro figure — a CAD 40 lunch is
+ * not €40, and silently treating it as one is the kind of quiet wrongness
+ * this app exists to avoid. Conversion needs a rate with a date on it, the
+ * same discipline docs/PAY-RULES.md applies to every outside figure.
+ */
+export const REPORTING_CURRENCY = 'EUR';
+
+export const inReportingCurrency = (t: Txn) => (t.currency ?? REPORTING_CURRENCY) === REPORTING_CURRENCY;
+
+/** Rows captured but not summed, by currency — so the UI can say so. */
+export function excludedByCurrency(
+  txns: Txn[],
+  from: string,
+  to: string,
+): Record<string, number> {
+  const out: Record<string, number> = {};
+  for (const t of txns) {
+    if (t.posted_on < from || t.posted_on > to) continue;
+    if (inReportingCurrency(t)) continue;
+    out[t.currency] = (out[t.currency] ?? 0) + 1;
+  }
+  return out;
+}
+
 export function spendingByCategory(txns: Txn[], from: string, to: string): CategoryTotal[] {
   const buckets = new Map<SpendCategory, { cents: number; count: number }>();
 
   for (const t of txns) {
     if (t.posted_on < from || t.posted_on > to) continue;
+    if (!inReportingCurrency(t)) continue;
     if (!isSpending(t.category)) continue;
-    if (t.amount_cents >= 0) continue;
 
     const bucket = buckets.get(t.category) ?? { cents: 0, count: 0 };
+
+    // Negative adds to what was spent; positive takes it back off. A positive
+    // amount inside a SPENDING category is a refund that has been matched to
+    // its purchase — income and transfers never reach here, they are excluded
+    // above. Without this the category was right and the total still wrong:
+    // an €80 jumper refunded €60 kept reporting €80 of spending.
     bucket.cents += -t.amount_cents;
-    bucket.count += 1;
+    if (t.amount_cents < 0) bucket.count += 1;
+
     buckets.set(t.category, bucket);
   }
 
   return [...buckets.entries()]
-    .map(([category, b]) => ({ category, ...b }))
+    .map(([category, b]) => ({
+      category,
+      ...b,
+      // Never below zero. A refund reduces what was spent, but "spent minus
+      // €40 on shopping" is not a fact about anything — a refund exceeding
+      // the purchases inside the window is a windfall, not negative
+      // spending, and letting it go negative would understate the total.
+      cents: Math.max(0, b.cents),
+    }))
+    .filter((c) => c.cents > 0 || c.count > 0)
     .sort((a, b) => b.cents - a.cents);
 }
 
@@ -113,7 +157,13 @@ export function totalSpending(txns: Txn[], from: string, to: string): number {
 export function transfersIn(txns: Txn[], from: string, to: string): number {
   return sumCents(
     txns
-      .filter((t) => t.posted_on >= from && t.posted_on <= to && t.category === 'transfer')
+      .filter(
+        (t) =>
+          t.posted_on >= from &&
+          t.posted_on <= to &&
+          inReportingCurrency(t) &&
+          t.category === 'transfer',
+      )
       .map((t) => Math.abs(t.amount_cents)),
   );
 }
@@ -166,13 +216,83 @@ export interface Cashflow {
   earningsCents: number;
   /** Committed outgoings across the same window. */
   outgoingsCents: number;
-  /** Discretionary spending recorded in the same window. */
+  /**
+   * Everything that actually left the account, unreduced.
+   *
+   * Deliberately still the full figure: the user has to be able to see what
+   * they committed to and what actually went out, as two separate facts.
+   */
   spendingCents: number;
+  /**
+   * The part of that spending which IS a committed outgoing arriving — rent
+   * leaving the account is the rent they already told us about, not a second
+   * rent. Subtracted once, never twice.
+   */
+  duplicatedCents: number;
+  /** Spending once the duplicates are removed. What surplus is built from. */
+  discretionaryCents: number;
   /** What is left once both are taken off. Can be negative. */
   surplusCents: number;
   /** Surplus expressed per week, which is the rate the goal is chased at. */
   perWeekCents: number;
   days: number;
+}
+
+/**
+ * Transactions that are a recurring outgoing showing up in the statement.
+ *
+ * Rent is recorded once as a commitment and then again when it leaves the
+ * account. Subtracting both understates the surplus by a month's rent, which
+ * on a €600 tenancy runs the goal projection about ten weeks pessimistic —
+ * and the model repeats that figure faithfully, because a tool computed it.
+ *
+ * Matching is deliberately narrow: same category, amount within 1% or 50c,
+ * and never more occurrences than the cadence can produce in the window. A
+ * loose match would hide real spending, which is the opposite mistake and a
+ * worse one.
+ */
+export function duplicatedByOutgoings(
+  outgoings: Outgoing[],
+  txns: Txn[],
+  from: string,
+  to: string,
+): { cents: number; txnIds: string[] } {
+  const claimed = new Set<string>();
+  let cents = 0;
+
+  const candidates = txns.filter(
+    (t) =>
+      t.posted_on >= from &&
+      t.posted_on <= to &&
+      inReportingCurrency(t) &&
+      t.amount_cents < 0 &&
+      isSpending(t.category),
+  );
+
+  for (const o of outgoings) {
+    if (!outgoingActiveIn(o, from, to)) continue;
+
+    // How many times this commitment can legitimately appear in the window.
+    const occurrences = Math.max(
+      1,
+      Math.round(daysInclusive(from, to) / CADENCE_DAYS[o.cadence]),
+    );
+    const tolerance = Math.max(50, Math.round(o.amount_cents * 0.01));
+
+    let matched = 0;
+    for (const t of candidates) {
+      if (matched >= occurrences) break;
+      if (claimed.has(t.id)) continue;
+      if (t.category !== o.category) continue;
+      if (Math.abs(Math.abs(t.amount_cents) - o.amount_cents) > tolerance) continue;
+
+      claimed.add(t.id);
+      cents += Math.abs(t.amount_cents);
+      matched++;
+    }
+  }
+
+  return { cents, txnIds: [...claimed] };
 }
 
 /**
@@ -193,12 +313,19 @@ export function cashflow(
   const days = daysInclusive(from, to);
   const outgoingsCents = outgoingsTotalIn(outgoings, from, to);
   const spendingCents = totalSpending(txns, from, to);
-  const surplusCents = earningsCents - outgoingsCents - spendingCents;
+
+  // A committed outgoing and its own bank line are one payment, not two.
+  const duplicatedCents = duplicatedByOutgoings(outgoings, txns, from, to).cents;
+  const discretionaryCents = spendingCents - duplicatedCents;
+
+  const surplusCents = earningsCents - outgoingsCents - discretionaryCents;
 
   return {
     earningsCents,
     outgoingsCents,
     spendingCents,
+    duplicatedCents,
+    discretionaryCents,
     surplusCents,
     perWeekCents: days === 0 ? 0 : roundToCents((surplusCents * 7) / days),
     days,

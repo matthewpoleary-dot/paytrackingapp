@@ -21,7 +21,10 @@ import type { SpendCategory } from './types';
 export interface ParsedTxn {
   posted_on: string;
   description: string;
+  /** The NATIVE amount. Not converted — see the note on currency below. */
   amount_cents: number;
+  /** ISO 4217, as the statement gave it. */
+  currency: string;
   category: SpendCategory;
   external_id: string;
 }
@@ -32,7 +35,25 @@ export interface ParseResult {
   skipped: { line: number; reason: string }[];
   /** Rows present but not yet completed — excluded, because they may vanish. */
   pending: number;
+  /** Non-EUR rows captured, by currency. Stored, but not yet summed. */
+  foreign: Record<string, number>;
 }
+
+/**
+ * Currency.
+ *
+ * Non-EUR rows used to be skipped. Safe, but it meant that from January, in
+ * Montreal, every local transaction would be absent and the budget would go
+ * blind exactly when it mattered. Data not captured is unrecoverable; a sum
+ * that has to wait is merely late.
+ *
+ * So the native amount and its currency are both stored, and nothing is
+ * converted. Totals remain euro-only and the UI says how many rows were left
+ * out. FX conversion is a separate decision with its own rate-and-date
+ * discipline, and inventing one here would be the same failure as inventing
+ * a pay rule.
+ */
+const DEFAULT_CURRENCY = 'EUR';
 
 /** A CSV line split on commas, respecting double quotes. */
 function splitCsvLine(line: string): string[] {
@@ -81,21 +102,86 @@ const HINTS: [RegExp, SpendCategory][] = [
   [/to savings|savings vault|vault/i, 'transfer'],
 ];
 
-export function guessCategory(description: string, amountCents: number): SpendCategory {
-  if (amountCents > 0) return 'income';
+/**
+ * Words that mean money came back, not money earned.
+ *
+ * Revolut writes a refund as a positive amount, which is indistinguishable
+ * from wages by sign alone.
+ */
+const REFUND_WORDS = /refund|reversal|returned|chargeback|cashback|reimburse/i;
+
+export function guessCategory(
+  description: string,
+  amountCents: number,
+  type = '',
+): SpendCategory {
+  if (amountCents > 0) {
+    // Revolut's Type is definitive where it exists: CARD_REFUND is a refund
+    // however the merchant chose to name the line.
+    const isRefund = /REFUND|REVERSAL|CHARGEBACK/i.test(type) || REFUND_WORDS.test(description);
+    return isRefund ? 'refund' : 'income';
+  }
   for (const [pattern, category] of HINTS) {
     if (pattern.test(description)) return category;
   }
   return 'other';
 }
 
+/**
+ * Give a refund the category of the purchase it reverses, so it nets off.
+ *
+ * Every positive row used to be 'income'. An €80 jumper returned for €60
+ * reported €80 of spending and €60 of income — wrong in both directions,
+ * with the original never offset.
+ *
+ * Matching is narrow on purpose: same description and currency, an earlier
+ * negative of at least the refund's size, within 90 days. A refund that
+ * cannot be matched stays 'refund', which is excluded from both spending and
+ * income rather than guessed into one of them.
+ */
+export function matchRefunds(rows: ParsedTxn[]): ParsedTxn[] {
+  const spends = rows
+    .filter((r) => r.amount_cents < 0)
+    .sort((a, b) => a.posted_on.localeCompare(b.posted_on));
+
+  return rows.map((row) => {
+    // Anything positive is a candidate, not only rows already labelled a
+    // refund: a Revolut refund is usually indistinguishable from income by
+    // description alone, and matching it to its own purchase is the only
+    // reliable signal there is.
+    if (row.amount_cents <= 0) return row;
+    if (row.category !== 'refund' && row.category !== 'income') return row;
+
+    const original = spends.find(
+      (s) =>
+        s.description.toLowerCase() === row.description.toLowerCase() &&
+        s.currency === row.currency &&
+        s.posted_on <= row.posted_on &&
+        Math.abs(s.amount_cents) >= row.amount_cents &&
+        daysBetween(s.posted_on, row.posted_on) <= 90,
+    );
+
+    if (original) return { ...row, category: original.category };
+
+    // Unmatched: a labelled refund stays a refund; anything else is income.
+    return row;
+  });
+}
+
+const daysBetween = (from: string, to: string) =>
+  Math.round(
+    (Date.parse(`${to}T00:00:00Z`) - Date.parse(`${from}T00:00:00Z`)) / 86_400_000,
+  );
+
 export function parseRevolutCsv(csv: string): ParseResult {
   const lines = csv.split(/\r?\n/).filter((l) => l.trim().length > 0);
   const rows: ParsedTxn[] = [];
   const skipped: ParseResult['skipped'] = [];
+  const foreign: Record<string, number> = {};
+  const seen = new Map<string, number>();
   let pending = 0;
 
-  if (lines.length === 0) return { rows, skipped, pending };
+  if (lines.length === 0) return { rows, skipped, pending, foreign };
 
   const header = splitCsvLine(lines[0]).map((h) => h.toLowerCase());
   const at = (name: string) => header.indexOf(name);
@@ -107,28 +193,26 @@ export function parseRevolutCsv(csv: string): ParseResult {
   const iFee = at('fee');
   const iState = at('state');
   const iCurrency = at('currency');
+  const iType = at('type');
 
   if (iAmount === -1 || iDescription === -1 || (iCompleted === -1 && iStarted === -1)) {
     return {
       rows,
       skipped: [{ line: 1, reason: 'This does not look like a Revolut export.' }],
       pending,
+      foreign,
     };
   }
 
   for (let n = 1; n < lines.length; n++) {
     const cells = splitCsvLine(lines[n]);
     const state = iState === -1 ? 'COMPLETED' : cells[iState]?.toUpperCase();
+    const type = iType === -1 ? '' : (cells[iType] ?? '');
 
     // Pending transactions can still disappear. Importing one would put a
     // figure in the log that never actually happened.
     if (state && state !== 'COMPLETED') {
       pending++;
-      continue;
-    }
-
-    if (iCurrency !== -1 && cells[iCurrency] && cells[iCurrency].toUpperCase() !== 'EUR') {
-      skipped.push({ line: n + 1, reason: `Not in euro (${cells[iCurrency]})` });
       continue;
     }
 
@@ -161,16 +245,36 @@ export function parseRevolutCsv(csv: string): ParseResult {
 
     const description = (cells[iDescription] || 'Transaction').slice(0, 300);
 
+    const currency =
+      iCurrency !== -1 && cells[iCurrency]
+        ? cells[iCurrency].toUpperCase().slice(0, 3)
+        : DEFAULT_CURRENCY;
+    if (currency !== DEFAULT_CURRENCY) foreign[currency] = (foreign[currency] ?? 0) + 1;
+
+    // Which occurrence of this exact row we are on, within this file.
+    const fingerprint = `${posted_on}|${description}|${withFee}|${currency}`;
+    const ordinal = (seen.get(fingerprint) ?? 0) + 1;
+    seen.set(fingerprint, ordinal);
+
     rows.push({
       posted_on,
       description,
       amount_cents: withFee,
-      category: guessCategory(description, withFee),
+      currency,
+      category: guessCategory(description, withFee, type),
       // Stable across re-exports of the same statement, which is what makes
       // re-importing safe. The unique index does the rest.
-      external_id: `${posted_on}|${description}|${withFee}`.slice(0, 200),
+      //
+      // The ordinal is load-bearing. Revolut's export carries no transaction
+      // id, so the key is derived from the row — and without a position in
+      // it, two £3.50 coffees at the same cafe on the same day hash
+      // identically and the second is dropped as a duplicate. That is the
+      // common case, not an edge case, and it silently under-reports
+      // spending. Re-import stays idempotent because the same file produces
+      // the same ordinals.
+      external_id: `${posted_on}|${description}|${withFee}|${currency}|${ordinal}`.slice(0, 200),
     });
   }
 
-  return { rows, skipped, pending };
+  return { rows: matchRefunds(rows), skipped, pending, foreign };
 }

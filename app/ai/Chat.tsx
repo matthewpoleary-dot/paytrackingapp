@@ -7,7 +7,7 @@ import { confirmProposal } from './actions';
 
 interface Proposal {
   proposal: true;
-  kind: 'goal_line' | 'outgoing' | 'profile_fact' | 'txn_category';
+  kind: 'goal_line' | 'outgoing' | 'profile_fact';
   payload: Record<string, unknown>;
   reasoning: string;
 }
@@ -56,7 +56,6 @@ const TOOL_LABEL: Record<string, string> = {
   propose_goal_line: 'Suggesting a goal line',
   propose_outgoing: 'Suggesting an outgoing',
   propose_profile_fact: 'Suggesting something to remember',
-  propose_txn_category: 'Suggesting a category',
 };
 
 /**

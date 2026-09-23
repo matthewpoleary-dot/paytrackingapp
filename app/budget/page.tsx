@@ -19,7 +19,7 @@ import {
   shiftsToClose,
   spendingByCategory,
 } from '@/lib/budget/calc';
-import { CATEGORY_LABEL } from '@/lib/budget/types';
+import { CATEGORY_LABEL, SPEND_CATEGORIES } from '@/lib/budget/types';
 import { valueShift } from '@/lib/pay/calc';
 import { addDays, dublinDate } from '@/lib/time/dublin';
 import {
@@ -31,7 +31,7 @@ import {
 } from '@/app/_components/ui';
 import { TabBar } from '@/app/_components/TabBar';
 import { CsvImport, GoalLineForm, OutgoingForm } from './BudgetForms';
-import { endOutgoing } from './actions';
+import { endOutgoing, setTxnCategory } from './actions';
 
 const CONFIDENCE_LABEL = { quoted: 'Booked', researched: 'Looked up', guess: 'A guess' } as const;
 
@@ -57,6 +57,9 @@ export default async function BudgetPage() {
   const earned = aggregate(shifts, settings);
   const flow = cashflow(earned.cents, outgoings, txns, from, today);
   const spending = spendingByCategory(txns, from, today);
+
+  // How much of the categorisation is still the importer's regex guess.
+  const guessedCount = txns.filter((t) => t.categorised_by === 'model').length;
   const peakSpend = Math.max(1, ...spending.map((s) => s.cents));
 
   const live = outgoings.filter((o) => o.ended_on === null);
@@ -295,14 +298,73 @@ export default async function BudgetPage() {
         <OutgoingForm />
       </section>
 
-      {/* -- Import. --------------------------------------------------------- */}
+      {/* -- Import, and fixing what it guessed. ----------------------------- */}
       <section className="mt-6">
         <p className="t-label mb-2 px-1 text-fg-secondary">Transactions</p>
         <CsvImport />
+
         {txns.length > 0 && (
-          <p className="t-caption mt-2 px-1 text-fg-secondary">
-            {txns.length} in the last four weeks.
-          </p>
+          <>
+            <p className="t-caption mt-3 px-1 text-fg-secondary">
+              {txns.length} in the last four weeks.{' '}
+              {guessedCount > 0 && `${guessedCount} still categorised by guesswork.`}
+            </p>
+
+            {/* Correcting a category lives here rather than in the Ask tab.
+                The assistant cannot see transactions at all — no description
+                or merchant name ever reaches it — which is what makes it
+                impossible for text in a bank statement to instruct it. The
+                trade is that recategorising is a picker, and that is the
+                right side of the trade. */}
+            <Card className="mt-2">
+              <Group>
+                {txns.slice(0, 40).map((t) => (
+                  <GroupRow key={t.id} className="flex items-center justify-between gap-3">
+                    <div className="min-w-0 flex-1">
+                      <p className="t-body truncate">{t.description}</p>
+                      <p className="t-caption mt-0.5 text-fg-secondary tabular-nums">
+                        {t.posted_on}
+                        {' · '}
+                        {t.amount_cents < 0 ? '−' : '+'}
+                        {formatCents(Math.abs(t.amount_cents))}
+                        {t.currency !== 'EUR' && ` ${t.currency}`}
+                        {t.categorised_by === 'model' && (
+                          <span className="text-attention"> · guessed</span>
+                        )}
+                      </p>
+                    </div>
+                    <form action={setTxnCategory}>
+                      <input type="hidden" name="id" value={t.id} />
+                      <label className="sr-only" htmlFor={`cat-${t.id}`}>
+                        Category for {t.description}
+                      </label>
+                      <select
+                        id={`cat-${t.id}`}
+                        name="category"
+                        defaultValue={t.category}
+                        className="t-caption min-h-11 rounded-lg bg-segment-track px-2"
+                      >
+                        {SPEND_CATEGORIES.map((c) => (
+                          <option key={c} value={c}>
+                            {CATEGORY_LABEL[c]}
+                          </option>
+                        ))}
+                      </select>
+                      <button type="submit" className="t-caption min-h-11 px-2 underline">
+                        Set
+                      </button>
+                    </form>
+                  </GroupRow>
+                ))}
+              </Group>
+            </Card>
+
+            {txns.length > 40 && (
+              <p className="t-caption mt-2 px-1 text-fg-tertiary">
+                Showing the 40 most recent.
+              </p>
+            )}
+          </>
         )}
       </section>
 
