@@ -69,6 +69,16 @@ export async function updateSession(request: NextRequest) {
   const authCode = request.nextUrl.searchParams.get('code');
   const authError = request.nextUrl.searchParams.get('error');
 
+  // TEMPORARY INSTRUMENTATION — 2026-09-23, PKCE trace. Remove after.
+  if (authCode || authError) {
+    console.info('[pkce:B] a code or error arrived', {
+      path,
+      willForward: !path.startsWith('/auth/'),
+      hasCode: Boolean(authCode),
+      hasError: Boolean(authError),
+    });
+  }
+
   if (!path.startsWith('/auth/') && (authCode || authError)) {
     const target = request.nextUrl.clone();
     if (authError) {

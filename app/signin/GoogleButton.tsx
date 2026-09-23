@@ -38,12 +38,33 @@ export function GoogleButton({ next }: { next: string }) {
     setError(null);
 
     const supabase = createClient();
+
+    // TEMPORARY INSTRUMENTATION — 2026-09-23, PKCE trace. Remove after.
+    const jar = () =>
+      document.cookie
+        .split(';')
+        .map((c) => c.trim().split('=')[0])
+        .filter(Boolean);
+    const before = jar();
+
     const { error: failure } = await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: {
         redirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent(next)}`,
         queryParams: { access_type: 'offline', prompt: 'consent' },
       },
+    });
+
+    // TEMPORARY INSTRUMENTATION — the jar at the moment of leaving. Logged
+    // synchronously because signInWithOAuth sets location, and anything
+    // queued after that may never run.
+    const after = jar();
+    console.info('[pkce:2] before leaving for Google', {
+      before,
+      after,
+      verifierWritten: after.filter((n) => n.includes('code-verifier')),
+      origin: window.location.origin,
+      secureContext: window.isSecureContext,
     });
 
     // Only reached when the redirect never happened; on success the browser
