@@ -34,7 +34,7 @@ comment on column public.txn.currency is
   'is never converted. Non-EUR rows are captured but excluded from euro '
   'totals until a rate policy exists.';
 
--- The importer''s key now carries the currency and a per-file ordinal, so two
+-- The importer's key now carries the currency and a per-file ordinal, so two
 -- identical rows in one statement survive as two. The index itself is
 -- unchanged; this note records why its input changed shape.
 comment on index public.txn_external_once is
